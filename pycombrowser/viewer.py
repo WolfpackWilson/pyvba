@@ -4,7 +4,10 @@ from inspect import getfullargspec
 
 class COMViewer:
     def __init__(self, app, **kwargs):
-        """Initialize the class from an application string or win32com object.
+        """Create a viewer from an application string or win32com object.
+
+        The COMViewer object used to observe and explore COM objects from external
+        applications.
 
         Parameters
         ----------
@@ -23,6 +26,18 @@ class COMViewer:
         self._errors = {}
 
     def __getattr__(self, item):
+        """Return the attribute or an error.
+
+        Parameters
+        ----------
+        item
+            The attribute to search for.
+
+        Notes
+        -----
+        If an issue occurred trying to find the attribute, an error is returned.
+        """
+
         try:
             return getattr(self._com, item)
         except BaseException as e:
@@ -30,6 +45,7 @@ class COMViewer:
             return e
 
     def __iter__(self):
+        """Return iteration of the combined names of the objects and methods."""
         return (str(obj) for obj in self._objects + self._methods)
 
     @property
@@ -89,15 +105,35 @@ class COMViewer:
 
 class FunctionViewer:
     def __init__(self, func, name: str = None):
+        """Create a viewer from a stored function.
+
+        A viewer object used to observe and run functions extracted from the COMViewer.
+
+        Parameters
+        ----------
+        func
+            A bound method.
+        name : str, optional
+            The name of the bound method.
+        """
+
         self._func = func
         self._name = name
         self._fullargspec = getfullargspec(func)
         self._args = self._fullargspec.args
 
     def __call__(self, *args, **kwargs):
+        """Calls the function and returns the function output."""
         return self._func(*args, **kwargs)
 
     def __str__(self):
+        """Returns a string of the class and how to use the function.
+
+        Notes
+        -----
+        The `self` argument is typically included as the first parameter and should be ignored when
+        calling the function.
+        """
         name = "func_name" if self._name is None else self._name
         args = ""
 
