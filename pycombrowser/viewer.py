@@ -3,7 +3,6 @@ from inspect import getfullargspec
 
 
 class COMViewer:
-    # TODO: implement error handling
     def __init__(self, app, **kwargs):
         """Initialize the class from an application string or win32com object.
 
@@ -21,9 +20,14 @@ class COMViewer:
             i for i in dir(self._com)
             if '_' not in i and i not in ['CLSID', 'coclass_clsid']
         ]
+        self._errors = {}
 
     def __getattr__(self, item):
-        return getattr(self._com, item)
+        try:
+            return getattr(self._com, item)
+        except BaseException as e:
+            self._errors[item] = e.args
+            return e
 
     def __iter__(self):
         return (str(obj) for obj in self._objects + self._methods)
@@ -54,21 +58,26 @@ class COMViewer:
         variables = {}
 
         for key in self._objects:
-            if not isinstance(self.view(key), COMViewer):
+            if not isinstance(self.view(key), (COMViewer, BaseException)):
                 variables[key] = self.getattr(key)
         return variables
 
+    @property
+    def errors(self):
+        """Return a dictionary in format {obj: Error}"""
+        return self._errors
+
     def getattr(self, item):
         """Return a variable, object, or method."""
-        return getattr(self._com, item)
+        return getattr(self, item)
 
     def func(self, name, *args):
         """Runs a function based on arguments given and returns the result."""
-        return getattr(self._com, name)(*args)
+        return getattr(self, name)(*args)
 
     def view(self, attr):
-        """Return a variable, method, or COMBrowser object."""
-        obj = getattr(self._com, attr)
+        """Return a variable, FunctionViewer, or COMBrowser object."""
+        obj = getattr(self, attr)
 
         if '<bound method' in str(obj):
             return FunctionViewer(obj, attr)
