@@ -16,6 +16,7 @@ class COMViewer:
         """
 
         self._com = EnsureDispatch(app)
+        self._name = kwargs.get('name', app)
         self._parent = kwargs.get('parent', None)
         self._kwargs = kwargs
         self._objects = [key for key in getattr(self._com, '_prop_map_get_').keys()]
@@ -48,10 +49,18 @@ class COMViewer:
         """Return iteration of the combined names of the objects and methods."""
         return (str(obj) for obj in self._objects + self._methods)
 
+    def __str__(self):
+        return "<class 'COMViewer'>: " + self._name
+
     @property
     def com(self):
         """Return the COM object."""
         return self._com
+
+    @property
+    def name(self):
+        """Return the name of the COM object."""
+        return self._name
 
     @property
     def parent(self):
@@ -98,7 +107,7 @@ class COMViewer:
         if '<bound method' in str(obj):
             return FunctionViewer(obj, attr)
         elif 'win32com' in str(obj) or 'COMObject' in str(obj):
-            return COMViewer(obj, parent=self._com)
+            return COMViewer(obj, parent=self._com, name=attr)
         else:
             return obj
 
