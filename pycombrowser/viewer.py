@@ -16,7 +16,7 @@ class COMViewer:
         """
 
         self._com = EnsureDispatch(app)
-        self._name = kwargs.get('name', app)
+        self._name = kwargs.get('name', str(app))
         self._parent = kwargs.get('parent', None)
         self._kwargs = kwargs
         self._objects = [key for key in getattr(self._com, '_prop_map_get_').keys()]
@@ -181,7 +181,10 @@ class IterableFunctionViewer(FunctionViewer):
         """
         super().__init__(func, name, **kwargs)
         self._count = count
-        self._items = [COMViewer(func(i), **kwargs) for i in range(1, count + 1)]
+        self._items = [
+            COMViewer(func(i), name=str(i), **kwargs)
+            for i in range(1, count + 1)
+        ]
 
     def __str__(self):
         """Return a string of the class and how to use the function."""
