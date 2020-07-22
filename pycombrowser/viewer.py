@@ -16,6 +16,7 @@ class COMViewer:
         """
 
         self._com = EnsureDispatch(app)
+        self._name = kwargs.get('name', str(app))
         self._parent = kwargs.get('parent', None)
         self._kwargs = kwargs
         self._objects = [key for key in getattr(self._com, '_prop_map_get_').keys()]
@@ -26,32 +27,43 @@ class COMViewer:
         self._errors = {}
 
     def __getattr__(self, item):
-        """Return the attribute or an error.
-
-        Parameters
-        ----------
-        item
-            The attribute to search for.
-
-        Notes
-        -----
-        If an issue occurred trying to find the attribute, an error is returned.
-        """
-
+        """Return a variable, FunctionViewer, or COMBrowser object."""
         try:
-            return getattr(self._com, item)
+            obj = getattr(self._com, item)
         except BaseException as e:
             self._errors[item] = e.args
             return e
+
+        if '<bound method' in str(obj):
+            if "Item" in item:
+                try:
+                    count = getattr(self._com, 'Count')
+                    return IterableFunctionViewer(obj, item, count)
+                except AttributeError:
+                    return FunctionViewer(obj, item)
+            else:
+                return FunctionViewer(obj, item)
+        elif 'win32com' in str(obj) or 'COMObject' in str(obj):
+            return COMViewer(obj, parent=self._com, name=item)
+        else:
+            return obj
 
     def __iter__(self):
         """Return iteration of the combined names of the objects and methods."""
         return (str(obj) for obj in self._objects + self._methods)
 
+    def __str__(self):
+        return "<class 'COMViewer'>: " + self._name
+
     @property
     def com(self):
         """Return the COM object."""
         return self._com
+
+    @property
+    def name(self):
+        """Return the name of the COM object."""
+        return self._name
 
     @property
     def parent(self):
@@ -84,27 +96,21 @@ class COMViewer:
         return self._errors
 
     def getattr(self, item):
-        """Return a variable, object, or method."""
-        return getattr(self, item)
+        """Alternative to `COMViewer.Attribute`. Return a variable, object, or method."""
+        return self.view(item)
 
     def func(self, name, *args):
-        """Runs a function based on arguments given and returns the result."""
+        """Alternative to `COMViewer.Attribute(*args)`. Runs a function based on arguments given and returns
+        the result."""
         return getattr(self, name)(*args)
 
     def view(self, attr):
-        """Return a variable, FunctionViewer, or COMBrowser object."""
-        obj = getattr(self, attr)
-
-        if '<bound method' in str(obj):
-            return FunctionViewer(obj, attr)
-        elif 'win32com' in str(obj) or 'COMObject' in str(obj):
-            return COMViewer(obj, parent=self._com)
-        else:
-            return obj
+        """Alternative to `COMViewer.Attribute`. Return a variable, FunctionViewer, or COMBrowser object."""
+        return getattr(self, attr)
 
 
 class FunctionViewer:
-    def __init__(self, func, name: str = None):
+    def __init__(self, func, name: str = None, **kwargs):
         """Create a viewer from a stored function.
 
         A viewer object used to observe and run functions extracted from the COMViewer.
@@ -127,17 +133,11 @@ class FunctionViewer:
         return self._func(*args, **kwargs)
 
     def __str__(self):
-        """Returns a string of the class and how to use the function.
-
-        Notes
-        -----
-        The `self` argument is typically included as the first parameter and should be ignored when
-        calling the function.
-        """
+        """Return a string of the class and how to use the function."""
         name = "func_name" if self._name is None else self._name
         args = ""
 
-        for arg in self._args:
+        for arg in self._args[1:]:
             args += arg + ', '
         return "<class 'FunctionViewer'>: {}({})".format(name, args[:-2])
 
@@ -157,10 +157,53 @@ class FunctionViewer:
         return self._fullargspec
 
     @property
-    def args(self):
+    def args(self) -> list:
         """Return the function arguments."""
-        return self._args
+        return self._args[1:]
 
     def call(self, *args, **kwargs):
         """Alternative function call."""
-        return self.__call__(*args, **kwargs)
+        return self(*args, **kwargs)
+
+
+class IterableFunctionViewer(FunctionViewer):
+    def __init__(self, func, name, count, **kwargs):
+        """Create a viewer from a stored iterable function.
+
+        Parameters
+        ----------
+        func
+            A bound method.
+        name : str, optional
+            The name of the bound method.
+        count : int
+            The number of items held.
+        """
+        super().__init__(func, name, **kwargs)
+        self._count = count
+        self._items = [
+            COMViewer(func(i), name=str(i), **kwargs)
+            for i in range(1, count + 1)
+        ]
+
+    def __str__(self):
+        """Return a string of the class and how to use the function."""
+        return super().__str__().replace("FunctionViewer", "IterableFunctionViewer")
+
+    def __iter__(self):
+        """Iterate through each item in the iterable function."""
+        return (item for item in self._items)
+
+    @property
+    def count(self) -> int:
+        """Return the count of the iterable function."""
+        return self._count
+
+    @property
+    def items(self) -> list:
+        """Return the items of the iterable function."""
+        return self._items
+
+    def item(self, i: int):
+        """Return a specific item of the iterable function."""
+        return self._items[i]
