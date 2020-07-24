@@ -82,7 +82,7 @@ class COMViewer:
 
     @property
     def variables(self) -> dict:
-        """Return a dictionary in format {name: value}"""
+        """Return a dictionary in format {name: value}."""
         variables = {}
 
         for key in self._objects:
@@ -92,7 +92,7 @@ class COMViewer:
 
     @property
     def errors(self):
-        """Return a dictionary in format {obj: Error}"""
+        """Return a dictionary in format {obj: Error}."""
         return self._errors
 
     def getattr(self, item):
