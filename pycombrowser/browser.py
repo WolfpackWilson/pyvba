@@ -92,7 +92,7 @@ class COMBrowser(COMViewer):
                 self._all[attr] = obj
 
     def print_browser(self, **kwargs):
-        """Prints out `all` in a readable way"""
+        """Prints out `all` in a readable way."""
         item = kwargs.get('item', self)
         tabs = kwargs.get('tabs', 0)
         name = ''
@@ -125,14 +125,14 @@ class COMBrowser(COMViewer):
         Parameters
         ----------
         exact: bool
-            A flag that searches for exact matches
+            A flag that searches for exact matches.
         name: str
-            The name of the attribute to search for
+            The name of the attribute to search for.
 
         Returns
         -------
         dict
-            The results of the search in format {path: item}
+            The results of the search in format {path: item}.
         """
 
         item = kwargs.get('item', self)
