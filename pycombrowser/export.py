@@ -1,4 +1,5 @@
 import re
+import os
 from pycombrowser.browser import COMBrowser, IterableFunctionBrowser
 from pycombrowser.viewer import FunctionViewer
 
@@ -12,7 +13,7 @@ class XMLExport:
         "<": "&lt;",
     }
 
-    def __init__(self, browser: COMBrowser, version=1.0, encoding: str = "UFT-8"):
+    def __init__(self, browser: COMBrowser, version=1.0, encoding: str = "UTF-8", skip_func: bool = False):
         """Create a well-formed XML string for export.
 
         Parameters
@@ -26,13 +27,14 @@ class XMLExport:
         """
         self._browser = browser
         self._xml_head = '<?xml version="{}" encoding="{}"?>\n'.format(str(version), encoding)
-        self._xml_str = ''
+        self._xml_str = None
         self._attrs = ['Name', 'Count']
-        self._generate()
+        self._skip_func = skip_func
 
     @property
     def string(self):
         """Return the well-formed XML in string format."""
+        self._check()
         return self._xml_str
 
     @property
@@ -41,13 +43,18 @@ class XMLExport:
 
         The minimized version removes all newlines and tabs.
         """
-
+        self._check()
         return re.sub('\n*\t*', '', self._xml_str)
 
     @staticmethod
     def xml_encode(text: str):
         """Map special XML characters to their encoded form in a given string."""
         return "".join(XMLExport.XML_ESCAPE_CHARS.get(c, c) for c in str(text))
+
+    def _check(self):
+        """Check if the xml_string needs to be generated."""
+        if self._xml_str is None:
+            self._generate()
 
     def _generate(self):
         """Begin generating the XML string."""
@@ -71,6 +78,8 @@ class XMLExport:
 
         xml = ''
         if isinstance(elem, (COMBrowser, IterableFunctionBrowser)):
+            # display the browser and its children
+
             # setup the tag and attributes
             attrs = ["Name", "Count"]
             tag = XMLExport.Tag(elem.name)
@@ -87,9 +96,12 @@ class XMLExport:
                     xml += self._generate_tag(value, tabs + 1, name=item)
             xml += '\t' * tabs + tag.close_tag + '\n'
         elif isinstance(elem, FunctionViewer):
-            # display the function and its properties
-            tag = XMLExport.Tag("Function", name=elem.name, params=len(elem.args))
-            xml += '\t' * tabs + tag.open_tag + tag.close_tag + '\n'
+            if not self._skip_func:
+                # display the function and its properties
+                tag = XMLExport.Tag("Function", name=elem.name, args=len(elem.args))
+                xml += '\t' * tabs + tag.open_tag + '\n'
+                xml += '\t' * (tabs + 1) + str(elem)[26:] + '\n'
+                xml += '\t' * tabs + tag.close_tag + '\n'
         elif isinstance(elem, BaseException):
             # display the error location and method
             tag = XMLExport.Tag("Error", on=str(elem.args[2][1]))
@@ -99,14 +111,30 @@ class XMLExport:
         else:
             # display the variable and value
             tag = XMLExport.Tag(kwargs.get('name', 'Unknown'))
-            xml += '\t' * tabs + tag.open_tag + '\n'
-            xml += '\t' * (tabs + 1) + self.xml_encode(elem) + '\n'
-            xml += '\t' * tabs + tag.close_tag + '\n'
+            xml += '\t' * tabs + tag.open_tag + self.xml_encode(elem) + tag.close_tag + '\n'
         return xml
 
     def print(self, minimize: bool = False):
         """Print the XML string in the normal or minimized version."""
-        print(self._xml_str) if not minimize else print(min)
+        self._check()
+        print(self._xml_str) if not minimize else print(self.min)
+
+    def save(self, name: str, path: str = '.\\', minimize: bool = False):
+        """Save to an xml file to a specified name and location.
+
+        Parameters
+        ----------
+        name: str
+            The file name.
+        path: str
+            The file path.
+        minimize: bool
+            A flag that determines the format of the final output.
+        """
+        save_as(
+            self.string if not minimize else self.min,
+            name, ".xml", path
+        )
 
     class Tag:
         NAME_RE = re.compile('(^xml)|(^[0-9]*)', re.IGNORECASE)
@@ -176,6 +204,21 @@ class JSONExport:
     pass
 
 
-# TODO write to file
-def save_as():
-    pass
+def save_as(data: str, name: str, ext: str, path: str = '.\\'):
+    """Save a string object to a specified name and location.
+
+    Parameters
+    ----------
+    data: str
+        The string data to be printed (e.g. XML, JSON, etc.).
+    name: str
+        The name of the file.
+    ext: str
+        The file extension (e.g. .xml, .json, etc.)
+    path: str
+        The save location.
+    """
+    os.makedirs(path, exist_ok=True)
+    file = open(os.path.join(path, name + ext), "w")
+    file.write(data)
+    file.close()
