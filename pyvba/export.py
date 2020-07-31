@@ -1,7 +1,7 @@
 import re
 import os
-from pycombrowser.browser import COMBrowser, IterableFunctionBrowser
-from pycombrowser.viewer import FunctionViewer
+from pyvba.browser import Browser, IterableFunctionBrowser
+from pyvba.viewer import FunctionViewer
 
 
 class XMLExport:
@@ -13,12 +13,12 @@ class XMLExport:
         "<": "&lt;",
     }
 
-    def __init__(self, browser: COMBrowser, version=1.0, encoding: str = "UTF-8", skip_func: bool = False):
+    def __init__(self, browser: Browser, version=1.0, encoding: str = "UTF-8", skip_func: bool = False):
         """Create a well-formed XML string for export.
 
         Parameters
         ----------
-        browser: COMBrowser
+        browser: Browser
             The object used to gather all variables.
         version
             The current version of the XML.
@@ -80,7 +80,7 @@ class XMLExport:
         """
 
         xml = ''
-        if isinstance(elem, (COMBrowser, IterableFunctionBrowser)):
+        if isinstance(elem, (Browser, IterableFunctionBrowser)):
             # display the browser and its children
 
             # setup the tag and attributes
@@ -205,7 +205,7 @@ class XMLExport:
 class JSONExport:
     JSON_ESCAPE_CHARS = ["\b", "\f", "\n", "\r", "\t", "\"", "\\"]
 
-    def __init__(self, browser: COMBrowser, skip_func: bool = False):
+    def __init__(self, browser: Browser, skip_func: bool = False):
         self._browser = browser
         self._skip_func = skip_func
         self._json_str = None
@@ -257,7 +257,7 @@ class JSONExport:
         """
 
         json = ''
-        if isinstance(elem, COMBrowser):
+        if isinstance(elem, Browser):
             # display the browser and its children
             json += "\t" * tabs + f"\"{self.json_encode(elem.name)}\": {{\n"
 
@@ -298,9 +298,9 @@ class JSONExport:
             name = self.json_encode(kwargs.get('name', 'Unknown'))
 
             if not isinstance(elem, (int, float, complex, bool)):
-                elem = self.json_encode(str(elem))
+                elem = f"\"{self.json_encode(str(elem))}\""
 
-            json += "\t" * tabs + f"\"{name}\": \"{elem}\",\n"
+            json += "\t" * tabs + f"\"{name}\": {elem},\n"
         return json
 
     def print(self, minimize: bool = False):
