@@ -16,7 +16,7 @@ class COMBrowser(COMViewer):
         super().__init__(app, **kwargs)
 
         # define filters
-        self._skip = kwargs.get('skip', [])
+        self._skip = kwargs.get('skip', []) + ["Application, Parent"]
         self._checked = kwargs.get('checked', [])
 
         self._all = {}
@@ -53,6 +53,7 @@ class COMBrowser(COMViewer):
             # skip if checked or user opts to skip it
             if attr in self._skip + self._checked:
                 continue
+                # TODO add max iterations per item
 
             # attempt to collect the attribute
             try:
@@ -201,7 +202,7 @@ class IterableFunctionBrowser(IterableFunctionViewer):
         """Create a browser for an iterable function to view its components."""
         super().__init__(func, name, count, **kwargs)
         self._all = {
-            str(i): COMBrowser(func(i), name=(kwargs.get('parent_name') + '_' + str(i)), **kwargs)
+            str(i): COMBrowser(func(i), name=(kwargs.get('parent_name') + "_Item"), **kwargs)
             for i in range(1, count + 1)
         }
 

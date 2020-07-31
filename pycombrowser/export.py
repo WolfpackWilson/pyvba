@@ -32,13 +32,13 @@ class XMLExport:
         self._skip_func = skip_func
 
     @property
-    def string(self):
+    def string(self) -> str:
         """Return the well-formed XML in string format."""
         self._check()
         return self._xml_str
 
     @property
-    def min(self):
+    def min(self) -> str:
         """Return the minimized XML in string format.
 
         The minimized version removes all newlines and tabs.
@@ -47,7 +47,7 @@ class XMLExport:
         return re.sub('\n*\t*', '', self._xml_str)
 
     @staticmethod
-    def xml_encode(text: str):
+    def xml_encode(text: str) -> str:
         """Map special XML characters to their encoded form in a given string."""
         return "".join(XMLExport.XML_ESCAPE_CHARS.get(c, c) for c in str(text))
 
@@ -99,19 +99,15 @@ class XMLExport:
             if not self._skip_func:
                 # display the function and its properties
                 tag = XMLExport.Tag("Function", name=elem.name, args=len(elem.args))
-                xml += '\t' * tabs + tag.open_tag + '\n'
-                xml += '\t' * (tabs + 1) + str(elem)[26:] + '\n'
-                xml += '\t' * tabs + tag.close_tag + '\n'
+                xml += tag.enclose(str(elem)[26:], tabs)
         elif isinstance(elem, BaseException):
             # display the error location and method
             tag = XMLExport.Tag("Error", on=str(elem.args[2][1]))
-            xml += '\t' * tabs + tag.open_tag + '\n'
-            xml += '\t' * (tabs + 1) + self.xml_encode(str(elem.args[2][2])) + '\n'
-            xml += '\t' * tabs + tag.close_tag + '\n'
+            xml += tag.enclose(self.xml_encode(str(elem.args[2][2])), tabs)
         else:
             # display the variable and value
             tag = XMLExport.Tag(kwargs.get('name', 'Unknown'))
-            xml += '\t' * tabs + tag.open_tag + self.xml_encode(elem) + tag.close_tag + '\n'
+            xml += tag.enclose(self.xml_encode(str(elem)), tabs)
         return xml
 
     def print(self, minimize: bool = False):
@@ -120,7 +116,7 @@ class XMLExport:
         print(self._xml_str) if not minimize else print(self.min)
 
     def save(self, name: str, path: str = '.\\', minimize: bool = False):
-        """Save to an xml file to a specified name and location.
+        """Save to an XML file to a specified name and location.
 
         Parameters
         ----------
@@ -178,7 +174,7 @@ class XMLExport:
             return tag + ">"
 
         @property
-        def close_tag(self):
+        def close_tag(self) -> str:
             """Return the formatted closing tag."""
             return "</{}>".format(self._name)
 
@@ -187,6 +183,10 @@ class XMLExport:
             """Return a string formatted to XML tag naming conventions."""
             text = XMLExport.Tag.NAME_RE.sub('', text)
             return text.strip('!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
+
+        def enclose(self, text: str, tabs: int):
+            """Return a string enclosed with the tag."""
+            return "\t" * tabs + self.open_tag + text + self.close_tag + "\n"
 
         def add_attr(self, attr: str, value):
             """Add an attribute to the tag."""
@@ -199,9 +199,128 @@ class XMLExport:
             return self._attrs.pop(attr)
 
 
-# TODO: export as a json
 class JSONExport:
-    pass
+    JSON_ESCAPE_CHARS = ["\b", "\f", "\n", "\r", "\t", "\"", "\\"]
+
+    def __init__(self, browser: COMBrowser, skip_func: bool = False):
+        self._browser = browser
+        self._skip_func = skip_func
+        self._json_str = None
+
+    @property
+    def string(self) -> str:
+        """Return the JSON in string format."""
+        self._check()
+        return self._json_str
+
+    @property
+    def min(self) -> str:
+        """Return the minimized JSON in string format.
+
+        The minimized version removes all newlines and tabs.
+        """
+        self._check()
+        return re.sub('\n*\t*', '', self._json_str)
+
+    @staticmethod
+    def json_encode(text: str) -> str:
+        """Map special JSON characters to their encoded form in a given string."""
+        return "".join(
+            "\\" + c
+            if c in JSONExport.JSON_ESCAPE_CHARS else c
+            for c in str(text)
+        )
+
+    def _check(self):
+        """Check if the JSON string needs to be generated."""
+        if self._json_str is None:
+            self._json_str = "{\n" + self._generate(self._browser, 1) + "}\n"
+            self._json_str = re.sub(r',(?!\s*?[{\[\"\'\w])', '', self._json_str)
+
+    def _generate(self, elem, tabs: int = 0, **kwargs) -> str:
+        """Recursively generate each element into a string.
+
+        Parameters
+        ----------
+        elem
+            The element to convert into an JSON string.
+        tabs: int
+            The indentation level of the current element.
+
+        Returns
+        -------
+        str
+            The JSON string of the element and sub-elements.
+        """
+
+        json = ''
+        if isinstance(elem, COMBrowser):
+            # display the browser and its children
+            json += "\t" * tabs + f"\"{self.json_encode(elem.name)}\": {{\n"
+
+            for item, value in elem.all.items():
+                json += self._generate(value, tabs + 1, name=item)
+
+            json += "\t" * tabs + "},\n"
+        elif isinstance(elem, IterableFunctionBrowser):
+            # display the function browser and its children
+            json += "\t" * tabs + f"\"{elem.name}\": {{\n"
+            json += "\t" * (tabs + 1) + f"\"Name\": \"{self.json_encode(elem.name)}\",\n"
+            json += "\t" * (tabs + 1) + f"\"Count\": {elem.count},\n"
+            json += "\t" * (tabs + 1) + f"\"Items\": [\n"
+
+            for item, value in elem.all.items():
+                json += "\t" * (tabs + 2) + "{\n"
+                json += self._generate(value, tabs + 3, name=item)
+                json += "\t" * (tabs + 2) + "},\n"
+
+            json += "\t" * (tabs + 1) + "]\n"
+            json += "\t" * tabs + "},\n"
+        elif isinstance(elem, FunctionViewer):
+            if not self._skip_func:
+                # display the function and its properties
+                json += "\t" * tabs + f"\"{self.json_encode(elem.name)}\": {{\n"
+                json += "\t" * (tabs + 1) + f"\"Name\": \"{self.json_encode(elem.name)}\",\n"
+                json += "\t" * (tabs + 1) + f"\"args\": {self.json_encode(str(len(elem.args)))},\n"
+                json += "\t" * (tabs + 1) + f"\"use\": \"{self.json_encode(str(elem)[26:])}\"\n"
+                json += "\t" * tabs + "},\n"
+        elif isinstance(elem, BaseException):
+            # display the error location and method
+            json += "\t" * tabs + "\"Error\": {\n"
+            json += "\t" * (tabs + 1) + f"\"on\": \"{self.json_encode(str(elem.args[2][1]))}\",\n"
+            json += "\t" * (tabs + 1) + f"\"message\": \"{self.json_encode(str(elem.args[2][2]))}\"\n"
+            json += "\t" * tabs + "},\n"
+        else:
+            # display the variable and value
+            name = self.json_encode(kwargs.get('name', 'Unknown'))
+
+            if not isinstance(elem, (int, float, complex, bool)):
+                elem = self.json_encode(str(elem))
+
+            json += "\t" * tabs + f"\"{name}\": \"{elem}\",\n"
+        return json
+
+    def print(self, minimize: bool = False):
+        """Print the XML string in the normal or minimized version."""
+        self._check()
+        print(self._json_str) if not minimize else print(self.min)
+
+    def save(self, name: str, path: str = '.\\', minimize: bool = False):
+        """Save to an JSON file to a specified name and location.
+
+        Parameters
+        ----------
+        name: str
+            The file name.
+        path: str
+            The file path.
+        minimize: bool
+            A flag that determines the format of the final output.
+        """
+        save_as(
+            self.string if not minimize else self.min,
+            name, ".json", path
+        )
 
 
 def save_as(data: str, name: str, ext: str, path: str = '.\\'):
@@ -219,6 +338,6 @@ def save_as(data: str, name: str, ext: str, path: str = '.\\'):
         The save location.
     """
     os.makedirs(path, exist_ok=True)
-    file = open(os.path.join(path, name + ext), "w")
-    file.write(data)
-    file.close()
+    with open(os.path.join(path, name + ext), "w") as file:
+        file.write(data)
+        file.close()
