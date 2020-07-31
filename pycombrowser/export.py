@@ -26,7 +26,7 @@ class XMLExport:
             The encoding type (default is UTF-8).
         """
         self._browser = browser
-        self._xml_head = '<?xml version="{}" encoding="{}"?>\n'.format(str(version), encoding)
+        self._xml_head = f'<?xml version="{str(version)}" encoding="{encoding}"?>\n'
         self._xml_str = None
         self._attrs = ['Name', 'Count']
         self._skip_func = skip_func
@@ -44,7 +44,7 @@ class XMLExport:
         The minimized version removes all newlines and tabs.
         """
         self._check()
-        return re.sub('\n*\t*', '', self._xml_str)
+        return re.sub(r'\n*\t*', '', self._xml_str)
 
     @staticmethod
     def xml_encode(text: str) -> str:
@@ -59,6 +59,9 @@ class XMLExport:
     def _generate(self):
         """Begin generating the XML string."""
         self._xml_str = self._xml_head + self._generate_tag(self._browser)
+
+        # convert empty elements to a single tag
+        self._xml_str = re.sub(r'></.*?>', ' />', self._xml_str)
 
     def _generate_tag(self, elem, tabs: int = 0, **kwargs) -> str:
         """Recursively generate each element into a string.
@@ -133,7 +136,7 @@ class XMLExport:
         )
 
     class Tag:
-        NAME_RE = re.compile('(^xml)|(^[0-9]*)', re.IGNORECASE)
+        NAME_RE = re.compile(r'(^xml)|(^[0-9]*)', re.IGNORECASE)
 
         def __init__(self, tag_name: str, **attrs):
             """Create and store XML tag information in the proper formatting.
@@ -168,7 +171,7 @@ class XMLExport:
             if len(self._attrs) > 0:
                 # add the attributes
                 tag += " " + " ".join(
-                    '{}="{}"'.format(key, value)
+                    f'{key}="{value}"'
                     for key, value in self._attrs.items()
                 )
             return tag + ">"
@@ -176,7 +179,7 @@ class XMLExport:
         @property
         def close_tag(self) -> str:
             """Return the formatted closing tag."""
-            return "</{}>".format(self._name)
+            return f"</{self._name}>"
 
         @staticmethod
         def format_name(text: str) -> str:
@@ -220,7 +223,7 @@ class JSONExport:
         The minimized version removes all newlines and tabs.
         """
         self._check()
-        return re.sub('\n*\t*', '', self._json_str)
+        return re.sub(r'\n*\t*', '', self._json_str)
 
     @staticmethod
     def json_encode(text: str) -> str:

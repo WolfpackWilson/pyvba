@@ -16,8 +16,9 @@ class COMBrowser(COMViewer):
         super().__init__(app, **kwargs)
 
         # define filters
-        self._skip = kwargs.get('skip', []) + ["Application, Parent"]
-        self._checked = kwargs.get('checked', [])
+        self._skip = kwargs.get('skip', []) + ["Application", "Parent"]
+        self._checked = kwargs.get('checked', {})
+        self._max_checks = kwargs.get('max_checks', 1)
 
         self._all = {}
 
@@ -51,9 +52,8 @@ class COMBrowser(COMViewer):
 
         for attr in self:
             # skip if checked or user opts to skip it
-            if attr in self._skip + self._checked:
+            if attr in self._skip or self._checked.get(attr, self._max_checks) <= 0:
                 continue
-                # TODO add max iterations per item
 
             # attempt to collect the attribute
             try:
@@ -74,20 +74,22 @@ class COMBrowser(COMViewer):
                             parent_name=self._name,
                             parent=self,
                             skip=self._skip,
-                            checked=self._checked
+                            checked=self._checked,
+                            max_checks=self._max_checks
                         )
                     except (AttributeError, NameError):
                         self._all[attr] = FunctionViewer(obj, attr)
                 else:
                     self._all[attr] = FunctionViewer(obj, attr)
             elif 'win32com' in str(obj) or 'COMObject' in str(obj):
-                self._checked.append(attr)
+                self._checked[attr] = self._checked.get(attr, self._max_checks) - 1
                 self._all[attr] = COMBrowser(
                     obj,
                     parent=self,
                     name=attr,
                     skip=self._skip,
                     checked=self._checked,
+                    max_checks=self._max_checks
                 )
             else:
                 self._all[attr] = obj
