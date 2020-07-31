@@ -139,7 +139,7 @@ class FunctionViewer:
 
         for arg in self._args[1:]:
             args += arg + ', '
-        return "<class 'FunctionViewer'>: {}({})".format(name, args[:-2])
+        return f"<class 'FunctionViewer'>: {name}({args[:-2]})"
 
     @property
     def func(self):
