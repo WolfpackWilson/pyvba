@@ -2,11 +2,11 @@ from win32com.client.gencache import EnsureDispatch
 from inspect import getfullargspec
 
 
-class COMViewer:
+class Viewer:
     def __init__(self, app, **kwargs):
         """Create a viewer from an application string or win32com object.
 
-        The COMViewer object used to observe and explore COM objects from external
+        The Viewer object used to observe and explore COM objects from external
         applications.
 
         Parameters
@@ -27,7 +27,7 @@ class COMViewer:
         self._errors = {}
 
     def __getattr__(self, item):
-        """Return a variable, FunctionViewer, or COMBrowser object."""
+        """Return a variable, FunctionViewer, or Browser object."""
         try:
             obj = getattr(self._com, item)
         except BaseException as e:
@@ -44,7 +44,7 @@ class COMViewer:
             else:
                 return FunctionViewer(obj, item)
         elif 'win32com' in str(obj) or 'COMObject' in str(obj):
-            return COMViewer(obj, parent=self._com, name=item)
+            return Viewer(obj, parent=self._com, name=item)
         else:
             return obj
 
@@ -53,7 +53,7 @@ class COMViewer:
         return (str(obj) for obj in self._objects + self._methods)
 
     def __str__(self):
-        return "<class 'COMViewer'>: " + self._name
+        return "<class 'Viewer'>: " + self._name
 
     @property
     def com(self):
@@ -82,30 +82,30 @@ class COMViewer:
 
     @property
     def variables(self) -> dict:
-        """Return a dictionary in format {name: value}"""
+        """Return a dictionary in format {name: value}."""
         variables = {}
 
         for key in self._objects:
-            if not isinstance(self.view(key), (COMViewer, BaseException)):
+            if not isinstance(self.view(key), (Viewer, BaseException)):
                 variables[key] = self.getattr(key)
         return variables
 
     @property
     def errors(self):
-        """Return a dictionary in format {obj: Error}"""
+        """Return a dictionary in format {obj: Error}."""
         return self._errors
 
     def getattr(self, item):
-        """Alternative to `COMViewer.Attribute`. Return a variable, object, or method."""
+        """Alternative to `Viewer.Attribute`. Return a variable, object, or method."""
         return self.view(item)
 
     def func(self, name, *args):
-        """Alternative to `COMViewer.Attribute(*args)`. Runs a function based on arguments given and returns
+        """Alternative to `Viewer.Attribute(*args)`. Runs a function based on arguments given and returns
         the result."""
         return getattr(self, name)(*args)
 
     def view(self, attr):
-        """Alternative to `COMViewer.Attribute`. Return a variable, FunctionViewer, or COMBrowser object."""
+        """Alternative to `Viewer.Attribute`. Return a variable, FunctionViewer, or Browser object."""
         return getattr(self, attr)
 
 
@@ -113,7 +113,7 @@ class FunctionViewer:
     def __init__(self, func, name: str = None, **kwargs):
         """Create a viewer from a stored function.
 
-        A viewer object used to observe and run functions extracted from the COMViewer.
+        A viewer object used to observe and run functions extracted from the Viewer.
 
         Parameters
         ----------
@@ -139,7 +139,7 @@ class FunctionViewer:
 
         for arg in self._args[1:]:
             args += arg + ', '
-        return "<class 'FunctionViewer'>: {}({})".format(name, args[:-2])
+        return f"<class 'FunctionViewer'>: {name}({args[:-2]})"
 
     @property
     def func(self):
@@ -182,7 +182,7 @@ class IterableFunctionViewer(FunctionViewer):
         super().__init__(func, name, **kwargs)
         self._count = count
         self._items = [
-            COMViewer(func(i), name=str(i), **kwargs)
+            Viewer(func(i), name=str(i), **kwargs)
             for i in range(1, count + 1)
         ]
 
