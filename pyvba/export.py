@@ -1,5 +1,6 @@
-import re
 import os
+import re
+
 from pyvba.browser import Browser, IterableFunctionBrowser
 from pyvba.viewer import FunctionViewer
 
