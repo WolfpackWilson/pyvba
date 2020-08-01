@@ -1,5 +1,6 @@
-from win32com.client.gencache import EnsureDispatch
 from inspect import getfullargspec
+
+from win32com.client.gencache import EnsureDispatch
 
 
 class Viewer:
