@@ -61,10 +61,10 @@ class Browser(Viewer):
             except BaseException as e:
                 self._errors[attr] = e.args
                 self._all[attr] = e
-                return
+                continue
 
             # sort by type
-            if '<bound method' in str(obj):
+            if '<bound method' in repr(obj):
                 # check for Item array
                 if "Item" == attr:
                     try:
@@ -81,7 +81,7 @@ class Browser(Viewer):
                         self._all[attr] = FunctionViewer(obj, attr)
                 else:
                     self._all[attr] = FunctionViewer(obj, attr)
-            elif 'win32com' in str(obj) or 'COMObject' in str(obj):
+            elif 'win32com' in repr(obj) or 'COMObject' in repr(obj):
                 self._checked[attr] = self._checked.get(attr, self._max_checks) - 1
                 self._all[attr] = Browser(
                     obj,

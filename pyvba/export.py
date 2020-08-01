@@ -298,7 +298,9 @@ class JSONExport:
             # display the variable and value
             name = self.json_encode(kwargs.get('name', 'Unknown'))
 
-            if not isinstance(elem, (int, float, complex, bool)):
+            if isinstance(elem, bool):
+                elem = str(elem).lower()
+            elif not isinstance(elem, (int, float, complex)):
                 elem = f"\"{self.json_encode(str(elem))}\""
 
             json += "\t" * tabs + f"\"{name}\": {elem},\n"
