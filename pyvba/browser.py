@@ -1,11 +1,11 @@
-from pycombrowser.viewer import COMViewer, FunctionViewer, IterableFunctionViewer
+from pyvba.viewer import Viewer, FunctionViewer, IterableFunctionViewer
 
 
-class COMBrowser(COMViewer):
+class Browser(Viewer):
     def __init__(self, app, **kwargs):
         """Create a browser from an application string or win32com object.
 
-        The COMBrowser object used to iterate through and explore COM objects from external
+        The Browser object used to iterate through and explore COM objects from external
         applications.
 
         Parameters
@@ -16,13 +16,14 @@ class COMBrowser(COMViewer):
         super().__init__(app, **kwargs)
 
         # define filters
-        self._skip = kwargs.get('skip', [])
-        self._checked = kwargs.get('checked', [])
+        self._skip = kwargs.get('skip', []) + ["Application", "Parent"]
+        self._checked = kwargs.get('checked', {})
+        self._max_checks = kwargs.get('max_checks', 1)
 
         self._all = {}
 
     def __str__(self):
-        return super().__str__().replace("COMViewer", "COMBrowser")
+        return super().__str__().replace("Viewer", "Browser")
 
     def __getattr__(self, item):
         if self._all == {}:
@@ -46,12 +47,12 @@ class COMBrowser(COMViewer):
 
         See Also
         --------
-        COMViewer.__getattr___
+        Viewer.__getattr___
         """
 
         for attr in self:
             # skip if checked or user opts to skip it
-            if attr in self._skip + self._checked:
+            if attr in self._skip or self._checked.get(attr, self._max_checks) <= 0:
                 continue
 
             # attempt to collect the attribute
@@ -73,26 +74,28 @@ class COMBrowser(COMViewer):
                             parent_name=self._name,
                             parent=self,
                             skip=self._skip,
-                            checked=self._checked
+                            checked=self._checked,
+                            max_checks=self._max_checks
                         )
                     except (AttributeError, NameError):
                         self._all[attr] = FunctionViewer(obj, attr)
                 else:
                     self._all[attr] = FunctionViewer(obj, attr)
             elif 'win32com' in str(obj) or 'COMObject' in str(obj):
-                self._checked.append(attr)
-                self._all[attr] = COMBrowser(
+                self._checked[attr] = self._checked.get(attr, self._max_checks) - 1
+                self._all[attr] = Browser(
                     obj,
                     parent=self,
                     name=attr,
                     skip=self._skip,
                     checked=self._checked,
+                    max_checks=self._max_checks
                 )
             else:
                 self._all[attr] = obj
 
     def print_browser(self, **kwargs):
-        """Prints out `all` in a readable way"""
+        """Prints out `all` in a readable way."""
         item = kwargs.get('item', self)
         tabs = kwargs.get('tabs', 0)
         name = ''
@@ -104,7 +107,7 @@ class COMBrowser(COMViewer):
         print("  " * tabs + name + str(item))
 
         # iterate through the corresponding browser
-        if isinstance(item, (COMBrowser, IterableFunctionBrowser)):
+        if isinstance(item, (Browser, IterableFunctionBrowser)):
             for i in list(item.all.keys()):
                 self.print_browser(item=item.all[i], name=i, tabs=(tabs + 1))
 
@@ -125,14 +128,14 @@ class COMBrowser(COMViewer):
         Parameters
         ----------
         exact: bool
-            A flag that searches for exact matches
+            A flag that searches for exact matches.
         name: str
-            The name of the attribute to search for
+            The name of the attribute to search for.
 
         Returns
         -------
         dict
-            The results of the search in format {path: item}
+            The results of the search in format {path: item}.
         """
 
         item = kwargs.get('item', self)
@@ -145,14 +148,14 @@ class COMBrowser(COMViewer):
                 paths.append(path + '/' + item.name)
 
         # search
-        if isinstance(item, (COMBrowser, IterableFunctionBrowser)):
+        if isinstance(item, (Browser, IterableFunctionBrowser)):
             for i in item.all:
                 if name in i:
                     if not exact or (exact and i == name):
                         paths.append(path + '/' + i)
 
                 value = item.all[i]
-                if isinstance(value, (COMBrowser, IterableFunctionBrowser)):
+                if isinstance(value, (Browser, IterableFunctionBrowser)):
                     paths += self.search(name, exact, item=value, path=(path + '/' + i))
 
         return paths
@@ -201,7 +204,7 @@ class IterableFunctionBrowser(IterableFunctionViewer):
         """Create a browser for an iterable function to view its components."""
         super().__init__(func, name, count, **kwargs)
         self._all = {
-            str(i): COMBrowser(func(i), name=(kwargs.get('parent_name') + '_' + str(i)), **kwargs)
+            str(i): Browser(func(i), name=(kwargs.get('parent_name') + "_Item"), **kwargs)
             for i in range(1, count + 1)
         }
 
