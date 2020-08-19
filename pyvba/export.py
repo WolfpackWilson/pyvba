@@ -14,7 +14,8 @@ class XMLExport:
         "<": "&lt;",
     }
 
-    def __init__(self, browser: Browser, version=1.0, encoding: str = "UTF-8", skip_func: bool = False):
+    def __init__(self, browser: Browser, version=1.0, encoding: str = "UTF-8", skip_func: bool = False,
+                 skip_err: bool = False):
         """Create a well-formed XML string for export.
 
         Parameters
@@ -31,6 +32,7 @@ class XMLExport:
         self._xml_str = None
         self._attrs = ['Name', 'Count']
         self._skip_func = skip_func
+        self._skip_err = skip_err
 
     @property
     def string(self) -> str:
@@ -106,8 +108,16 @@ class XMLExport:
                 xml += tag.enclose(str(elem)[26:], tabs)
         elif isinstance(elem, BaseException):
             # display the error location and method
-            tag = XMLExport.Tag("Error", on=str(elem.args[2][1]))
-            xml += tag.enclose(self.xml_encode(str(elem.args[2][2])), tabs)
+            if not self._skip_err:
+                try:
+                    tag = XMLExport.Tag("Error", on=str(elem.args[2][1]))
+                    xml += tag.enclose(self.xml_encode(str(elem.args[2][2])), tabs)
+                except (TypeError, IndexError):
+                    tag = XMLExport.Tag("Error")
+                    xml += tag.enclose(self.xml_encode(str(elem.args[2])), tabs)
+                except IndexError:
+                    tag = XMLExport.Tag("Error")
+                    xml += tag.enclose(self.xml_encode(str(elem)), tabs)
         else:
             # display the variable and value
             tag = XMLExport.Tag(kwargs.get('name', 'Unknown'))
@@ -172,7 +182,7 @@ class XMLExport:
             if len(self._attrs) > 0:
                 # add the attributes
                 tag += " " + " ".join(
-                    f'{key}="{value}"'
+                    f'{key}="{XMLExport.xml_encode(value)}"'
                     for key, value in self._attrs.items()
                 )
             return tag + ">"
@@ -206,9 +216,10 @@ class XMLExport:
 class JSONExport:
     JSON_ESCAPE_CHARS = ["\b", "\f", "\n", "\r", "\t", "\"", "\\"]
 
-    def __init__(self, browser: Browser, skip_func: bool = False):
+    def __init__(self, browser: Browser, skip_func: bool = False, skip_err: bool = False):
         self._browser = browser
         self._skip_func = skip_func
+        self._skip_err = skip_err
         self._json_str = None
 
     @property
@@ -290,10 +301,16 @@ class JSONExport:
                 json += "\t" * tabs + "},\n"
         elif isinstance(elem, BaseException):
             # display the error location and method
-            json += "\t" * tabs + "\"Error\": {\n"
-            json += "\t" * (tabs + 1) + f"\"on\": \"{self.json_encode(str(elem.args[2][1]))}\",\n"
-            json += "\t" * (tabs + 1) + f"\"message\": \"{self.json_encode(str(elem.args[2][2]))}\"\n"
-            json += "\t" * tabs + "},\n"
+            if not self._skip_err:
+                json += "\t" * tabs + "\"Error\": {\n"
+                try:
+                    json += "\t" * (tabs + 1) + f"\"on\": \"{self.json_encode(str(elem.args[2][1]))}\",\n"
+                    json += "\t" * (tabs + 1) + f"\"message\": \"{self.json_encode(str(elem.args[2][2]))}\"\n"
+                except TypeError:
+                    json += "\t" * (tabs + 1) + f"\"message\": \"{self.json_encode(str(elem.args[2]))}\"\n"
+                except IndexError:
+                    json += "\t" * (tabs + 1) + f"\"message\": \"{self.json_encode(str(elem))}\"\n"
+                json += "\t" * tabs + "},\n"
         else:
             # display the variable and value
             name = self.json_encode(kwargs.get('name', 'Unknown'))

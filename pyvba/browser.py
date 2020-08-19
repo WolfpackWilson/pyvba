@@ -16,9 +16,9 @@ class Browser(Viewer):
         super().__init__(app, **kwargs)
 
         # define filters
-        self._skip = kwargs.get('skip', []) + ["Application", "Parent"]
-        self._checked = kwargs.get('checked', {})
-        self._max_checks = kwargs.get('max_checks', 1)
+        self._skip = kwargs.get('skip', ["Application", "Parent"])      # user-defined skips
+        self._checked = kwargs.get('checked', {})                       # checked items
+        self._max_checks = kwargs.get('max_checks', 1)                  # maximum allowable instances of an object
 
         self._all = {}
 
@@ -55,44 +55,46 @@ class Browser(Viewer):
             if attr in self._skip or self._checked.get(attr, self._max_checks) <= 0:
                 continue
 
-            # attempt to collect the attribute
+            # attempt to collect and observe the attribute
             try:
                 obj = getattr(self._com, attr)
+
+                # sort by type
+                if '<bound method' in repr(obj):
+                    # check for Item array
+                    if "Item" == attr:
+                        # create the IterableFunctionBrowser
+                        # TODO infinite item issue
+                        try:
+                            count = getattr(self._com, 'Count')
+                            self._all[attr] = IterableFunctionBrowser(
+                                obj, attr, count,
+                                parent_name=self._name,
+                                parent=self,
+                                skip=self._skip,
+                                checked=self._checked,
+                                max_checks=self._max_checks
+                            )
+                        except Exception:
+                            self._all[attr] = FunctionViewer(obj, attr)
+                    else:
+                        self._all[attr] = FunctionViewer(obj, attr)
+                elif 'win32com' in repr(obj) or 'COMObject' in repr(obj):
+                    self._checked[attr] = self._checked.get(attr, self._max_checks) - 1
+                    self._all[attr] = Browser(
+                        obj,
+                        parent=self,
+                        name=attr,
+                        skip=self._skip,
+                        checked=self._checked,
+                        max_checks=self._max_checks
+                    )
+                else:
+                    self._all[attr] = obj
             except BaseException as e:
                 self._errors[attr] = e.args
                 self._all[attr] = e
                 continue
-
-            # sort by type
-            if '<bound method' in repr(obj):
-                # check for Item array
-                if "Item" == attr:
-                    try:
-                        count = getattr(self._com, 'Count')
-                        self._all[attr] = IterableFunctionBrowser(
-                            obj, attr, count,
-                            parent_name=self._name,
-                            parent=self,
-                            skip=self._skip,
-                            checked=self._checked,
-                            max_checks=self._max_checks
-                        )
-                    except (AttributeError, NameError):
-                        self._all[attr] = FunctionViewer(obj, attr)
-                else:
-                    self._all[attr] = FunctionViewer(obj, attr)
-            elif 'win32com' in repr(obj) or 'COMObject' in repr(obj):
-                self._checked[attr] = self._checked.get(attr, self._max_checks) - 1
-                self._all[attr] = Browser(
-                    obj,
-                    parent=self,
-                    name=attr,
-                    skip=self._skip,
-                    checked=self._checked,
-                    max_checks=self._max_checks
-                )
-            else:
-                self._all[attr] = obj
 
     def print_browser(self, **kwargs):
         """Prints out `all` in a readable way."""
@@ -203,8 +205,9 @@ class IterableFunctionBrowser(IterableFunctionViewer):
     def __init__(self, func, name, count, **kwargs):
         """Create a browser for an iterable function to view its components."""
         super().__init__(func, name, count, **kwargs)
+
         self._all = {
-            str(i): Browser(func(i), name=(kwargs.get('parent_name') + "_Item"), **kwargs)
+            str(i): Browser(func(i), name=(kwargs.get('parent_name')), **kwargs)
             for i in range(1, count + 1)
         }
 
