@@ -234,7 +234,7 @@
 												"HybridShapes": {
 													"Element": {
 														"DisplayName": "Sketch.4",
-														"Name": "CATIAReference102",
+														"Name": "CATIAReference148",
 														"ComposeWith": {
 															"Name": "ComposeWith",
 															"args": 1,
@@ -317,7 +317,7 @@
 													"Name": "Plane.1",
 													"Plane": {
 														"DisplayName": "yz plane",
-														"Name": "CATIAReference103",
+														"Name": "CATIAReference149",
 														"ComposeWith": {
 															"Name": "ComposeWith",
 															"args": 1,
@@ -331,7 +331,7 @@
 													},
 													"Point": {
 														"DisplayName": "Point.1",
-														"Name": "CATIAReference104",
+														"Name": "CATIAReference150",
 														"ComposeWith": {
 															"Name": "ComposeWith",
 															"args": 1,
@@ -1544,7 +1544,7 @@
 													},
 													"CenterCurveElement": {
 														"DisplayName": "Sketch.5",
-														"Name": "CATIAReference105",
+														"Name": "CATIAReference151",
 														"ComposeWith": {
 															"Name": "ComposeWith",
 															"args": 1,
@@ -56452,9 +56452,9 @@
 		"Selection": {
 			"Count": 0,
 			"Count2": 0,
-			"Name": "CATIASelection90",
+			"Name": "CATIASelection116",
 			"VisProperties": {
-				"Name": "CATIAVisPropertySet106",
+				"Name": "CATIAVisPropertySet152",
 				"GetItem": {
 					"Name": "GetItem",
 					"args": 1,

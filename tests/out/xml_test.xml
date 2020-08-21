@@ -75,7 +75,7 @@
 						<Function name="GetItem" args="1">GetItem(IDName)</Function>
 						<Item>
 							<HybridShapes Name="Point.1">
-								<Element Name="CATIAReference107">
+								<Element Name="CATIAReference153">
 									<DisplayName>Sketch.4</DisplayName>
 									<Function name="ComposeWith" args="1">ComposeWith(iReference)</Function>
 									<Function name="GetItem" args="1">GetItem(IDName)</Function>
@@ -97,12 +97,12 @@
 								<Function name="SetCoordinates" args="1">SetCoordinates(oCoordinates)</Function>
 							</HybridShapes>
 							<HybridShapes Name="Plane.1">
-								<Plane Name="CATIAReference108">
+								<Plane Name="CATIAReference154">
 									<DisplayName>yz plane</DisplayName>
 									<Function name="ComposeWith" args="1">ComposeWith(iReference)</Function>
 									<Function name="GetItem" args="1">GetItem(IDName)</Function>
 								</Plane>
-								<Point Name="CATIAReference109">
+								<Point Name="CATIAReference155">
 									<DisplayName>Point.1</DisplayName>
 									<Function name="ComposeWith" args="1">ComposeWith(iReference)</Function>
 									<Function name="GetItem" args="1">GetItem(IDName)</Function>
@@ -471,7 +471,7 @@
 									<Function name="OpenEdition" args="0">OpenEdition()</Function>
 									<Function name="SetAbsoluteAxisData" args="1">SetAbsoluteAxisData(iAxisData)</Function>
 								</CenterCurve>
-								<CenterCurveElement Name="CATIAReference110">
+								<CenterCurveElement Name="CATIAReference156">
 									<DisplayName>Sketch.5</DisplayName>
 									<Function name="ComposeWith" args="1">ComposeWith(iReference)</Function>
 									<Function name="GetItem" args="1">GetItem(IDName)</Function>
@@ -16238,9 +16238,9 @@
 	<ReadOnly>False</ReadOnly>
 	<Saved>True</Saved>
 	<SeeHiddenElements>False</SeeHiddenElements>
-	<Selection Count="0" Name="CATIASelection90">
+	<Selection Count="0" Name="CATIASelection116">
 		<Count2>0</Count2>
-		<VisProperties Name="CATIAVisPropertySet111">
+		<VisProperties Name="CATIAVisPropertySet157">
 			<Function name="GetItem" args="1">GetItem(IDName)</Function>
 			<Function name="GetLayer" args="2">GetLayer(oLayerType, oLayerValue)</Function>
 			<Function name="GetPick" args="1">GetPick(oPick)</Function>
