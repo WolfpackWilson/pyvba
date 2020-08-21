@@ -1,5 +1,6 @@
-from win32com.client.gencache import EnsureDispatch
 from inspect import getfullargspec
+
+from win32com.client.gencache import EnsureDispatch
 
 
 class Viewer:
@@ -16,7 +17,7 @@ class Viewer:
         """
 
         self._com = EnsureDispatch(app)
-        self._name = kwargs.get('name', str(app))
+        self._name = kwargs.get('name', repr(app)[1:-1])
         self._parent = kwargs.get('parent', None)
         self._kwargs = kwargs
         self._objects = [key for key in getattr(self._com, '_prop_map_get_').keys()]
@@ -34,7 +35,7 @@ class Viewer:
             self._errors[item] = e.args
             return e
 
-        if '<bound method' in str(obj):
+        if '<bound method' in repr(obj):
             if "Item" in item:
                 try:
                     count = getattr(self._com, 'Count')
@@ -43,7 +44,7 @@ class Viewer:
                     return FunctionViewer(obj, item)
             else:
                 return FunctionViewer(obj, item)
-        elif 'win32com' in str(obj) or 'COMObject' in str(obj):
+        elif 'win32com' in repr(obj) or 'COMObject' in repr(obj):
             return Viewer(obj, parent=self._com, name=item)
         else:
             return obj
