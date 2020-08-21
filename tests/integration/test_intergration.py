@@ -22,7 +22,7 @@ def redirect_print(func, *args, **kwargs):
 class TestBrowser(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.b = pyvba.Browser(APP)
+        cls.b = pyvba.Browser(APP).ActiveDocument
 
     @classmethod
     def tearDownClass(cls) -> None:
