@@ -1,87 +1,114 @@
 import unittest
 from pyvba import viewer as v
 
-viewer = v.Viewer('CATIA.Application')
+APP = "CATIA.Application"
 
 
 class TestViewer(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.viewer = v.Viewer(APP)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.viewer = None
+
     def test_instance(self):
-        self.assertIsInstance(viewer, v.Viewer)
+        self.assertIsInstance(self.viewer, v.Viewer)
 
     def test_com(self):
-        self.assertIsNotNone(viewer.com)
+        self.assertIsNotNone(self.viewer.com)
 
     def test_name(self):
-        self.assertEqual(viewer.name, "CATIA.Application")
+        self.assertEqual(self.viewer.name, APP)
 
     def test_parent(self):
-        self.assertIsNone(viewer.parent)
+        self.assertIsNone(self.viewer.parent)
 
     def test_objects(self):
-        self.assertTrue(len(viewer.objects) > 0)
+        self.assertTrue(len(self.viewer.objects) > 0)
 
     def test_methods(self):
-        self.assertTrue(len(viewer.methods) > 0)
+        self.assertTrue(len(self.viewer.methods) > 0)
 
     def test_variables(self):
-        self.assertTrue(len(viewer.variables.keys()) > 0)
-        self.assertIsInstance(viewer.variables, dict)
+        self.assertTrue(len(self.viewer.variables.keys()) > 0)
+        self.assertIsInstance(self.viewer.variables, dict)
 
     def test_errors(self):
-        self.assertTrue(len(viewer.errors) >= 0)
+        self.assertTrue(len(self.viewer.errors) >= 0)
 
     def test_getattr(self):
-        self.assertIsInstance(getattr(viewer, "ActiveDocument"), v.Viewer)
-        self.assertIsInstance(viewer.getattr("ActiveDocument"), v.Viewer)
-        self.assertIsInstance(viewer.ActiveDocument, v.Viewer)
-
-        # note that these objects don't refer to the same object
-        self.assertIsNot(viewer.ActiveDocument, getattr(viewer, "ActiveDocument"))
+        self.assertIsInstance(getattr(self.viewer, "ActiveDocument"), v.Viewer)
+        self.assertIsInstance(self.viewer.getattr("ActiveDocument"), v.Viewer)
+        self.assertIsInstance(self.viewer.ActiveDocument, v.Viewer)
 
     def test_func(self):
-        viewer2 = viewer.ActiveDocument.Part.Bodies
+        viewer2 = self.viewer.ActiveDocument.Part.Bodies
         self.assertIsNotNone(viewer2.func("Item", 1))
         self.assertIsNotNone(viewer2.Item(1))
 
     def test_view(self):
-        self.assertIsInstance(viewer.view("ActiveDocument"), v.Viewer)
+        self.assertIsInstance(self.viewer.view("ActiveDocument"), v.Viewer)
 
 
 class TestFunctionViewer(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.f_viewer = v.Viewer(APP).ActiveDocument.Save
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.f_viewer = None
+
     def test_instance(self):
-        pass
+        self.assertIsInstance(self.f_viewer, v.FunctionViewer)
 
     def test_func(self):
-        pass
+        self.assertIsNone(self.f_viewer())
 
     def test_name(self):
-        pass
+        self.assertEqual(self.f_viewer.name, "Save")
 
     def test_fullargspec(self):
-        pass
+        self.assertEqual(
+            str(self.f_viewer.fullargspec),
+            "FullArgSpec(args=['self'], varargs=None, varkw=None, defaults=None, kwonlyargs=[], kwonlydefaults=None, "
+            "annotations={})"
+        )
 
     def test_args(self):
-        pass
+        self.assertIsInstance(self.f_viewer.args, list)
 
     def test_call(self):
-        pass
+        self.assertIsNone(self.f_viewer.call())
 
 
 class TestIterableFunctionViewer(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.i_viewer = v.Viewer(APP).ActiveDocument.Part.Bodies.Item
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.i_viewer = None
+
     def test_instance(self):
-        pass
+        self.assertIsInstance(self.i_viewer, v.IterableFunctionViewer)
 
     def test_iter(self):
-        pass
+        items = [item for item in self.i_viewer]
+        self.assertTrue(len(items) > 0)
 
     def test_count(self):
-        pass
+        self.assertEqual(len(self.i_viewer.items), self.i_viewer.count)
 
     def test_items(self):
-        pass
+        self.assertTrue(len(self.i_viewer.items) > 0)
+        self.assertIsInstance(self.i_viewer.items, list)
 
     def test_item(self):
-        pass
+        self.assertIsNotNone(self.i_viewer.item(0))
 
 
 if __name__ == '__main__':

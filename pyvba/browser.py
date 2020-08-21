@@ -115,7 +115,8 @@ class Browser(Viewer):
 
     def skip(self, item: str):
         """Adds a keyword to the skip list."""
-        self._skip.append(item)
+        if item not in self._skip:
+            self._skip.append(item)
 
     def rm_skip(self, item: str):
         """Remove a keyword from the skip list."""
@@ -187,7 +188,7 @@ class Browser(Viewer):
 
     def reset(self):
         """Clear the `all` property and the checked list."""
-        self._checked = []
+        self._checked = {}
         self._all = {}
 
     def reset_all(self):
