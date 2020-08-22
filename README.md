@@ -1,8 +1,7 @@
 # pyvba
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pyvba)
-![PyPI](https://img.shields.io/pypi/v/pyvba)
-![GitHub](https://img.shields.io/github/license/TheEric960/pyvba)
-
+[![PyPI](https://img.shields.io/pypi/v/pyvba)](https://pypi.org/project/pyvba/)
+[![GitHub](https://img.shields.io/github/license/TheEric960/pyvba)](https://github.com/TheEric960/pyvba)
 
 The pyvba package was designed to gather data from VBA-based applications (e.g. Microsoft Excel, CATIA, etc.). It
 may also be used to assist programming VBA macro scripts in a more sensical language. 
