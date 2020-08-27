@@ -91,6 +91,8 @@ class Browser(Viewer):
                     )
                 else:
                     self._all[attr] = obj
+            except KeyboardInterrupt:
+                raise
             except BaseException as e:
                 self._errors[attr] = e.args
                 self._all[attr] = e

@@ -31,6 +31,8 @@ class Viewer:
         """Return a variable, FunctionViewer, or Browser object."""
         try:
             obj = getattr(self._com, item)
+        except KeyboardInterrupt:
+            raise
         except BaseException as e:
             self._errors[item] = e.args
             return e
