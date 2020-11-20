@@ -1,11 +1,79 @@
 import os
 import re
 
-from pyvba.browser import Browser, IterableFunctionBrowser
+from pyvba.browser import Browser, CollectionBrowser
 from pyvba.viewer import FunctionViewer
 
 
-class XMLExport:
+class ExportStr:
+    def __init__(self, browser: Browser, skip_func: bool = False, skip_err: bool = False):
+        """The base class for exporting
+
+        Parameters
+        ----------
+        browser: Browser
+            The object used to gather all variables.
+        skip_func: bool
+            Skips reporting any FunctionViewer instant.
+        skip_err: bool
+            Skips reporting any error.
+        """
+        self._browser = browser
+        self._data = None
+
+        self._skip_func = skip_func
+        self._skip_err = skip_err
+
+    @property
+    def data_str(self) -> str:
+        """Return the data in string format."""
+        self._check()
+        return self._data
+
+    @property
+    def data_min(self) -> str:
+        """Return the data in minimized string format.
+
+        The minimized version removes all newlines and tabs.
+        """
+        self._check()
+        return re.sub(r'\n*\t*', '', self._data)
+
+    def _check(self):
+        """Check if the string needs to be generated."""
+        if self._data is None:
+            self._generate()
+
+    def _generate(self, *args, **kwargs):
+        """Begin generating the string."""
+        pass
+
+    def save_as(self, name: str, ext: str, path: str = '.\\', minimize: bool = False):
+        """Save a string object to a specified name and location.
+
+        Parameters
+        ----------
+        name: str
+            The name of the file.
+        ext: str
+            The file extension (e.g. .xml, .json, etc.)
+        path: str
+            The save location.
+        minimize: bool
+            A flag that determines the format of the final output.
+        """
+        os.makedirs(path, exist_ok=True)
+        with open(os.path.join(path, name + ext), "w") as file:
+            file.write(self.data_str if not minimize else self.data_min)
+            file.close()
+
+    def print(self, minimize: bool = False):
+        """Print the string in the normal or minimized version."""
+        self._check()
+        print(self.data_str if not minimize else self.data_min)
+
+
+class XMLExport(ExportStr):
     XML_ESCAPE_CHARS = {
         "&": "&amp;",
         '"': "&quot;",
@@ -27,44 +95,22 @@ class XMLExport:
         encoding: str
             The encoding type (default is UTF-8).
         """
-        self._browser = browser
+        super().__init__(browser, skip_func, skip_err)
+
         self._xml_head = f'<?xml version="{str(version)}" encoding="{encoding}"?>\n'
-        self._xml_str = None
         self._attrs = ['Name', 'Count']
-        self._skip_func = skip_func
-        self._skip_err = skip_err
-
-    @property
-    def string(self) -> str:
-        """Return the well-formed XML in string format."""
-        self._check()
-        return self._xml_str
-
-    @property
-    def min(self) -> str:
-        """Return the minimized XML in string format.
-
-        The minimized version removes all newlines and tabs.
-        """
-        self._check()
-        return re.sub(r'\n*\t*', '', self._xml_str)
 
     @staticmethod
     def xml_encode(text: str) -> str:
         """Map special XML characters to their encoded form in a given string."""
         return "".join(XMLExport.XML_ESCAPE_CHARS.get(c, c) for c in str(text))
 
-    def _check(self):
-        """Check if the xml_string needs to be generated."""
-        if self._xml_str is None:
-            self._generate()
-
     def _generate(self):
         """Begin generating the XML string."""
-        self._xml_str = self._xml_head + self._generate_tag(self._browser)
+        self._data = self._xml_head + self._generate_tag(self._browser)
 
         # convert empty elements to a single tag
-        self._xml_str = re.sub(r'></.*?>', ' />', self._xml_str)
+        self._data = re.sub(r'></.*?>', ' />', self._data)
 
     def _generate_tag(self, elem, tabs: int = 0, **kwargs) -> str:
         """Recursively generate each element into a string.
@@ -83,7 +129,7 @@ class XMLExport:
         """
 
         xml = ''
-        if isinstance(elem, (Browser, IterableFunctionBrowser)):
+        if isinstance(elem, Browser):
             # display the browser and its children
 
             # setup the tag and attributes
@@ -98,8 +144,21 @@ class XMLExport:
             # add the element and start adding the sub-elements
             xml += '\t' * tabs + tag.open_tag + '\n'
             for item, value in elem.all.items():
-                if item not in attrs:
-                    xml += self._generate_tag(value, tabs + 1, name=item)
+                if type(value) is list:
+                    item_tag = XMLExport.Tag("Item")
+
+                    xml += '\t' * (tabs + 1) + item_tag.open_tag + '\n'
+                    for i in value:
+                        xml += self._generate_tag(i, tabs + 2)
+                    xml += '\t' * (tabs + 1) + item_tag.close_tag + '\n'
+
+                elif item not in attrs:
+                    # NOTE: this is here
+                    if item == elem.name:
+                        continue
+                    else:
+                        xml += self._generate_tag(value, tabs + 1, name=item)
+
             xml += '\t' * tabs + tag.close_tag + '\n'
         elif isinstance(elem, FunctionViewer):
             if not self._skip_func:
@@ -112,7 +171,7 @@ class XMLExport:
                 try:
                     tag = XMLExport.Tag("Error", on=str(elem.args[2][1]))
                     xml += tag.enclose(self.xml_encode(str(elem.args[2][2])), tabs)
-                except (TypeError, IndexError):
+                except TypeError:
                     tag = XMLExport.Tag("Error")
                     xml += tag.enclose(self.xml_encode(str(elem.args[2])), tabs)
                 except IndexError:
@@ -124,27 +183,9 @@ class XMLExport:
             xml += tag.enclose(self.xml_encode(str(elem)), tabs)
         return xml
 
-    def print(self, minimize: bool = False):
-        """Print the XML string in the normal or minimized version."""
-        self._check()
-        print(self._xml_str) if not minimize else print(self.min)
-
     def save(self, name: str, path: str = '.\\', minimize: bool = False):
-        """Save to an XML file to a specified name and location.
-
-        Parameters
-        ----------
-        name: str
-            The file name.
-        path: str
-            The file path.
-        minimize: bool
-            A flag that determines the format of the final output.
-        """
-        save_as(
-            self.string if not minimize else self.min,
-            name, ".xml", path
-        )
+        """Save to a file."""
+        super().save_as(name, '.xml', path, minimize)
 
     class Tag:
         NAME_RE = re.compile(r'(^xml)|(^[0-9]*)', re.IGNORECASE)
@@ -213,29 +254,11 @@ class XMLExport:
             return self._attrs.pop(attr)
 
 
-class JSONExport:
+class JSONExport(ExportStr):
     JSON_ESCAPE_CHARS = ["\b", "\f", "\n", "\r", "\t", "\"", "\\"]
 
     def __init__(self, browser: Browser, skip_func: bool = False, skip_err: bool = False):
-        self._browser = browser
-        self._skip_func = skip_func
-        self._skip_err = skip_err
-        self._json_str = None
-
-    @property
-    def string(self) -> str:
-        """Return the JSON in string format."""
-        self._check()
-        return self._json_str
-
-    @property
-    def min(self) -> str:
-        """Return the minimized JSON in string format.
-
-        The minimized version removes all newlines and tabs.
-        """
-        self._check()
-        return re.sub(r'\n*\t*', '', self._json_str)
+        super(JSONExport, self).__init__(browser, skip_func, skip_err)
 
     @staticmethod
     def json_encode(text: str) -> str:
@@ -248,9 +271,9 @@ class JSONExport:
 
     def _check(self):
         """Check if the JSON string needs to be generated."""
-        if self._json_str is None:
-            self._json_str = "{\n" + self._generate(self._browser, 1) + "}\n"
-            self._json_str = re.sub(r',(?!\s*?[{\[\"\'\w])', '', self._json_str)
+        if self._data is None:
+            self._data = "{\n" + self._generate(self._browser, 1) + "}\n"
+            self._data = re.sub(r',(?!\s*?[{\[\"\'\w])', '', self._data)
 
     def _generate(self, elem, tabs: int = 0, **kwargs) -> str:
         """Recursively generate each element into a string.
@@ -277,20 +300,20 @@ class JSONExport:
                 json += self._generate(value, tabs + 1, name=item)
 
             json += "\t" * tabs + "},\n"
-        elif isinstance(elem, IterableFunctionBrowser):
-            # display the function browser and its children
-            json += "\t" * tabs + f"\"{elem.name}\": {{\n"
-            json += "\t" * (tabs + 1) + f"\"Name\": \"{self.json_encode(elem.name)}\",\n"
-            json += "\t" * (tabs + 1) + f"\"Count\": {elem.count},\n"
-            json += "\t" * (tabs + 1) + f"\"Items\": [\n"
-
-            for item, value in elem.all.items():
-                json += "\t" * (tabs + 2) + "{\n"
-                json += self._generate(value, tabs + 3, name=item)
-                json += "\t" * (tabs + 2) + "},\n"
-
-            json += "\t" * (tabs + 1) + "]\n"
-            json += "\t" * tabs + "},\n"
+        # elif isinstance(elem, IterableFunctionBrowser):
+        #     # display the function browser and its children
+        #     json += "\t" * tabs + f"\"{elem.name}\": {{\n"
+        #     json += "\t" * (tabs + 1) + f"\"Name\": \"{self.json_encode(elem.name)}\",\n"
+        #     json += "\t" * (tabs + 1) + f"\"Count\": {elem.count},\n"
+        #     json += "\t" * (tabs + 1) + f"\"Items\": [\n"
+        #
+        #     for item, value in elem.all.items():
+        #         json += "\t" * (tabs + 2) + "{\n"
+        #         json += self._generate(value, tabs + 3, name=item)
+        #         json += "\t" * (tabs + 2) + "},\n"
+        #
+        #     json += "\t" * (tabs + 1) + "]\n"
+        #     json += "\t" * tabs + "},\n"
         elif isinstance(elem, FunctionViewer):
             if not self._skip_func:
                 # display the function and its properties
@@ -322,45 +345,3 @@ class JSONExport:
 
             json += "\t" * tabs + f"\"{name}\": {elem},\n"
         return json
-
-    def print(self, minimize: bool = False):
-        """Print the XML string in the normal or minimized version."""
-        self._check()
-        print(self._json_str) if not minimize else print(self.min)
-
-    def save(self, name: str, path: str = '.\\', minimize: bool = False):
-        """Save to an JSON file to a specified name and location.
-
-        Parameters
-        ----------
-        name: str
-            The file name.
-        path: str
-            The file path.
-        minimize: bool
-            A flag that determines the format of the final output.
-        """
-        save_as(
-            self.string if not minimize else self.min,
-            name, ".json", path
-        )
-
-
-def save_as(data: str, name: str, ext: str, path: str = '.\\'):
-    """Save a string object to a specified name and location.
-
-    Parameters
-    ----------
-    data: str
-        The string data to be printed (e.g. XML, JSON, etc.).
-    name: str
-        The name of the file.
-    ext: str
-        The file extension (e.g. .xml, .json, etc.)
-    path: str
-        The save location.
-    """
-    os.makedirs(path, exist_ok=True)
-    with open(os.path.join(path, name + ext), "w") as file:
-        file.write(data)
-        file.close()

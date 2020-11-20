@@ -1,8 +1,13 @@
-from pyvba.viewer import Viewer, FunctionViewer, IterableFunctionViewer
+from pyvba.viewer import Viewer, FunctionViewer, CollectionViewer
+
+# used to skip predetermined objects by exact name
+# fixme: remove extra parameters
+skip = ['Application', 'Parent', 'Units', 'Parameters']
 
 
+# TODO: fix infinite recursion issue
 class Browser(Viewer):
-    def __init__(self, app, **kwargs):
+    def __init__(self, app, name: str, parent: Viewer = None):
         """Create a browser from an application string or win32com object.
 
         The Browser object used to iterate through and explore COM objects from external
@@ -13,27 +18,44 @@ class Browser(Viewer):
         app
             The application string (e.g. "Excel.Application") or win32com object.
         """
-        super().__init__(app, **kwargs)
-
-        # define filters
-        self._skip = kwargs.get('skip', ["Application", "Parent"])      # user-defined skips
-        self._checked = kwargs.get('checked', {})                       # checked items
-        self._max_checks = kwargs.get('max_checks', 1)                  # maximum allowable instances of an object
-
+        super().__init__(app, name, parent)
         self._all = {}
 
     def __str__(self):
-        return super().__str__().replace("Viewer", "Browser")
+        return super().__str__().replace('Viewer', 'Browser')
 
     def __getattr__(self, item):
         if self._all == {}:
             self._generate()
 
-        try:
-            obj = self._all[item]
-        except AttributeError:
-            obj = getattr(self._com, item)
-        return obj
+        obj = super().getattr(item)
+        return obj if isinstance(obj, FunctionViewer) or not isinstance(obj, Viewer) else self.from_viewer(obj)
+
+    @staticmethod
+    def from_viewer(viewer, parent=None):
+        """Turn a Viewer object into a Browser object."""
+        return CollectionBrowser(viewer) if isinstance(viewer, CollectionViewer) \
+            else Browser(viewer.com, viewer.name, viewer.parent if parent is None else parent)
+
+    @staticmethod
+    def skip(item: str):
+        """Adds a keyword to the skip list."""
+        global skip
+        if item not in skip:
+            skip.append(item)
+
+    @staticmethod
+    def rm_skip(item: str):
+        """Remove a keyword from the skip list."""
+        global skip
+        if item in skip:
+            skip.remove(item)
+
+    @staticmethod
+    def clr_skip():
+        """Resets the skip list to its original state."""
+        global skip
+        skip = ['Application', 'Parent']
 
     @property
     def all(self) -> dict:
@@ -43,87 +65,25 @@ class Browser(Viewer):
         return self._all
 
     def _generate(self):
-        """Iterates through all instances of COM objects when called upon.
+        """Iterates through all objects when called upon."""
+        global skip
 
-        See Also
-        --------
-        Viewer.__getattr___
-        """
-
-        for attr in self:
-            # skip if checked or user opts to skip it
-            if attr in self._skip or self._checked.get(attr, self._max_checks) <= 0:
+        for name in self._objects + [i.name for i in self._methods]:
+            if name in skip:
                 continue
 
-            # attempt to collect and observe the attribute
             try:
-                obj = getattr(self._com, attr)
+                obj = super().getattr(name)
 
-                # sort by type
-                if '<bound method' in repr(obj):
-                    # check for Item array
-                    if "Item" == attr:
-                        # create the IterableFunctionBrowser
-                        # TODO infinite item issue
-                        try:
-                            count = getattr(self._com, 'Count')
-                            self._all[attr] = IterableFunctionBrowser(
-                                obj, attr, count,
-                                parent_name=self._name,
-                                parent=self,
-                                skip=self._skip,
-                                checked=self._checked,
-                                max_checks=self._max_checks
-                            )
-                        except Exception:
-                            self._all[attr] = FunctionViewer(obj, attr)
-                    else:
-                        self._all[attr] = FunctionViewer(obj, attr)
-                elif 'win32com' in repr(obj) or 'COMObject' in repr(obj):
-                    self._checked[attr] = self._checked.get(attr, self._max_checks) - 1
-                    self._all[attr] = Browser(
-                        obj,
-                        parent=self,
-                        name=attr,
-                        skip=self._skip,
-                        checked=self._checked,
-                        max_checks=self._max_checks
-                    )
+                if isinstance(obj, Viewer):
+                    self._all[name] = self.from_viewer(obj, self)
                 else:
-                    self._all[attr] = obj
+                    self._all[name] = obj
             except BaseException as e:
-                self._errors[attr] = e.args
-                self._all[attr] = e
+                self._errors[name] = e.args
                 continue
 
-    def print_browser(self, **kwargs):
-        """Prints out `all` in a readable way."""
-        item = kwargs.get('item', self)
-        tabs = kwargs.get('tabs', 0)
-        name = ''
-
-        # attach a name if not self describing
-        if 'class' not in str(item):
-            name = kwargs.get('name') + ': '
-
-        print("  " * tabs + name + str(item))
-
-        # iterate through the corresponding browser
-        if isinstance(item, (Browser, IterableFunctionBrowser)):
-            for i in list(item.all.keys()):
-                self.print_browser(item=item.all[i], name=i, tabs=(tabs + 1))
-
-    def skip(self, item: str):
-        """Adds a keyword to the skip list."""
-        if item not in self._skip:
-            self._skip.append(item)
-
-    def rm_skip(self, item: str):
-        """Remove a keyword from the skip list."""
-        if item in self._skip:
-            self._skip.remove(item)
-
-    def search(self, name: str, exact: bool = False, **kwargs):
+    def search(self, name: str, exact: bool = False):
         """Return a dictionary in format {path: item} matching the name.
 
         Search for all instances of a method or object containing a name.
@@ -140,28 +100,7 @@ class Browser(Viewer):
         dict
             The results of the search in format {path: item}.
         """
-
-        item = kwargs.get('item', self)
-        paths = []
-        path = kwargs.get('path', self._name)
-
-        # add to list if found
-        if type(item) == FunctionViewer and name in item.name:
-            if not exact or (exact and name == item.name):
-                paths.append(path + '/' + item.name)
-
-        # search
-        if isinstance(item, (Browser, IterableFunctionBrowser)):
-            for i in item.all:
-                if name in i:
-                    if not exact or (exact and i == name):
-                        paths.append(path + '/' + i)
-
-                value = item.all[i]
-                if isinstance(value, (Browser, IterableFunctionBrowser)):
-                    paths += self.search(name, exact, item=value, path=(path + '/' + i))
-
-        return paths
+        ...
 
     def goto(self, path: str):
         """Retrieve an object at a given location.
@@ -176,56 +115,22 @@ class Browser(Viewer):
         `goto('Bodies/Item/1/HybridShapes/GetItem')` yields the 'GetItem' function.
 
         """
-        item = self
-        path = path.split('/')
-
-        for loc in path[1:]:
-            if isinstance(item, IterableFunctionBrowser):
-                item = item(int(loc))
-            else:
-                item = getattr(item, loc)
-        return item
-
-    def reset(self):
-        """Clear the `all` property and the checked list."""
-        self._checked = {}
-        self._all = {}
-
-    def reset_all(self):
-        """Clear the `all` property and all empties the skip list."""
-        self._skip = []
-        self.reset()
+        ...
 
     def regen(self):
         """Regenerate the `all` property."""
-        self.reset()
+        self._all = {}
         self._generate()
 
 
-class IterableFunctionBrowser(IterableFunctionViewer):
-    def __init__(self, func, name, count, **kwargs):
-        """Create a browser for an iterable function to view its components."""
-        super().__init__(func, name, count, **kwargs)
-
-        self._all = {
-            str(i): Browser(func(i), name=(kwargs.get('parent_name')), **kwargs)
-            for i in range(1, count + 1)
-        }
+class CollectionBrowser(Browser, CollectionViewer):
+    def __init__(self, obj: CollectionViewer):
+        super().__init__(obj.com, obj.name, obj.parent)
+        self._items = [self.from_viewer(i) for i in self._items]
 
     def __str__(self):
-        return super().__str__().replace('FunctionViewer', "FunctionBrowser")
+        return "<class 'CollectionBrowser'>: " + self._name
 
-    def __getattr__(self, item):
-        if self._all == {}:
-            self._generate()
-
-        try:
-            obj = self._all[item]
-        except AttributeError:
-            obj = getattr(self._com, item)
-        return obj
-
-    @property
-    def all(self):
-        """Return a dict of objects in the form `{name: item}`."""
-        return self._all
+    def _generate(self):
+        super()._generate()
+        self._all['Item'] = self._items
