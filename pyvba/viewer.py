@@ -42,7 +42,7 @@ class Viewer:
         self._errors = {}
 
     def __eq__(self, other):
-        return other.type == self._type and other.getattr('Name') == self.getattr('Name')
+        return other.type == self._type and other.name == self._name
 
     def __getattr__(self, item):
         return self.getattr(item)
@@ -58,7 +58,7 @@ class Viewer:
         """
         try:
             app = EnsureDispatch(com)
-        except AttributeError:
+        except (AttributeError, TypeError):
             # Remove cache and try again.
             module_list = [m.__name__ for m in sys.modules.values()]
             for module in module_list:
@@ -75,7 +75,7 @@ class Viewer:
             return FunctionViewer(obj, item)
         elif 'win32com' in repr(obj) or 'COMObject' in repr(obj):
             try:
-                _ = [e for e in obj]
+                _ = len(obj)
                 return CollectionViewer(obj, item, parent)
             except (TypeError, AttributeError):
                 return Viewer(obj, item, parent)
@@ -187,7 +187,7 @@ class CollectionViewer(Viewer):
         super().__init__(obj, name, parent)
 
         self._count = len(self._com)
-        self._items = [Viewer.gettype(i, name, self) for i in self._com]
+        self._items = [Viewer.gettype(i, name, self) for i in self._com if i is not super()._com]
 
     def __str__(self):
         return super().__str__().replace('Viewer', 'CollectionViewer')

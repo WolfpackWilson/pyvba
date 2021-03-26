@@ -1,11 +1,13 @@
 from pyvba.viewer import Viewer, FunctionViewer, CollectionViewer
+from collections import OrderedDict
 
 # used to skip predetermined objects by exact name
-# fixme: remove extra parameters
-skip = ['Application', 'Parent', 'Units', 'Parameters']
+skip = ['Application', 'Parent']
+
+# store a dictionary of the discovered items
+found = OrderedDict()
 
 
-# TODO: fix infinite recursion issue
 class Browser(Viewer):
     def __init__(self, app, name: str, parent: Viewer = None):
         """Create a browser from an application string or win32com object.
@@ -38,18 +40,26 @@ class Browser(Viewer):
             else Browser(viewer.com, viewer.name, viewer.parent if parent is None else parent)
 
     @staticmethod
-    def skip(item: str):
-        """Adds a keyword to the skip list."""
-        global skip
-        if item not in skip:
-            skip.append(item)
+    def clr_found():
+        """Clears the stored dictionary of items browsed."""
+        global found
+        found = OrderedDict()
 
     @staticmethod
-    def rm_skip(item: str):
-        """Remove a keyword from the skip list."""
+    def skip(*item: str):
+        """Add one or more keywords to the skip list."""
         global skip
-        if item in skip:
-            skip.remove(item)
+        for i in item:
+            if i not in skip:
+                skip.append(i)
+
+    @staticmethod
+    def rm_skip(*item: str):
+        """Remove one or more keywords from the skip list."""
+        global skip
+        for i in item:
+            if i not in skip:
+                skip.remove(i)
 
     @staticmethod
     def clr_skip():
@@ -66,8 +76,9 @@ class Browser(Viewer):
 
     def _generate(self):
         """Iterates through all objects when called upon."""
-        global skip
+        global skip, found
 
+        # iterate through items
         for name in self._objects + [i.name for i in self._methods]:
             if name in skip:
                 continue
@@ -82,6 +93,17 @@ class Browser(Viewer):
             except BaseException as e:
                 self._errors[name] = e.args
                 continue
+
+        # add items to the 'found' dictionary
+        for name, value in self._all.items():
+            if isinstance(value, Viewer):
+                if value.type not in found:
+                    found[value.type] = []
+
+                if value not in found[value.type]:
+                    found[value.type].append(value)
+                else:
+                    self._all[name] = found[value.type].index(value)
 
     def search(self, name: str, exact: bool = False):
         """Return a dictionary in format {path: item} matching the name.
