@@ -85,7 +85,7 @@ class Viewer:
         """Return a variable, FunctionViewer, or Viewer object."""
         try:
             obj = getattr(self._com, item)
-        except AttributeError:
+        except (AttributeError, KeyboardInterrupt):
             raise
         except BaseException as e:
             self._errors[item] = e
