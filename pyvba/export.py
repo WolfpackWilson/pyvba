@@ -1,7 +1,7 @@
 import os
 import re
 
-from pyvba.browser import Browser, CollectionBrowser
+from pyvba.browser import Browser
 from pyvba.viewer import FunctionViewer
 
 
@@ -98,7 +98,6 @@ class XMLExport(ExportStr):
         super().__init__(browser, skip_func, skip_err)
 
         self._xml_head = f'<?xml version="{str(version)}" encoding="{encoding}"?>\n'
-        self._attrs = ['Name', 'Count']
 
     @staticmethod
     def xml_encode(text: str) -> str:
@@ -153,7 +152,7 @@ class XMLExport(ExportStr):
                     xml += '\t' * (tabs + 1) + item_tag.close_tag + '\n'
 
                 elif item not in attrs:
-                    # NOTE: this is here
+                    # overlook objects that call itself
                     if item == elem.name:
                         continue
                     else:
@@ -272,7 +271,7 @@ class JSONExport(ExportStr):
     def _check(self):
         """Check if the JSON string needs to be generated."""
         if self._data is None:
-            self._data = "{\n" + self._generate(self._browser, 1) + "}\n"
+            self._data = self._generate(self._browser)
             self._data = re.sub(r',(?!\s*?[{\[\"\'\w])', '', self._data)
 
     def _generate(self, elem, tabs: int = 0, **kwargs) -> str:
@@ -294,46 +293,38 @@ class JSONExport(ExportStr):
         json = ''
         if isinstance(elem, Browser):
             # display the browser and its children
-            json += "\t" * tabs + f"\"{self.json_encode(elem.name)}\": {{\n"
+            json += "\t" * tabs + f"{{ \"{self.json_encode(elem.name)}\": [\n"
 
             for item, value in elem.all.items():
-                json += self._generate(value, tabs + 1, name=item)
+                if type(value) is list and len(value) > 0:
+                    json += "\t" * (tabs + 1) + "{ \"Item\": [\n"
+                    for i in value:
+                        json += self._generate(i, tabs + 2)
+                    json += "\t" * (tabs + 1) + "]},\n"
+                else:
+                    json += self._generate(value, tabs + 1, name=item)
 
-            json += "\t" * tabs + "},\n"
-        # elif isinstance(elem, IterableFunctionBrowser):
-        #     # display the function browser and its children
-        #     json += "\t" * tabs + f"\"{elem.name}\": {{\n"
-        #     json += "\t" * (tabs + 1) + f"\"Name\": \"{self.json_encode(elem.name)}\",\n"
-        #     json += "\t" * (tabs + 1) + f"\"Count\": {elem.count},\n"
-        #     json += "\t" * (tabs + 1) + f"\"Items\": [\n"
-        #
-        #     for item, value in elem.all.items():
-        #         json += "\t" * (tabs + 2) + "{\n"
-        #         json += self._generate(value, tabs + 3, name=item)
-        #         json += "\t" * (tabs + 2) + "},\n"
-        #
-        #     json += "\t" * (tabs + 1) + "]\n"
-        #     json += "\t" * tabs + "},\n"
+            json += "\t" * tabs + "]},\n"
         elif isinstance(elem, FunctionViewer):
             if not self._skip_func:
                 # display the function and its properties
-                json += "\t" * tabs + f"\"{self.json_encode(elem.name)}\": {{\n"
-                json += "\t" * (tabs + 1) + f"\"Name\": \"{self.json_encode(elem.name)}\",\n"
-                json += "\t" * (tabs + 1) + f"\"args\": {self.json_encode(str(len(elem.args)))},\n"
-                json += "\t" * (tabs + 1) + f"\"use\": \"{self.json_encode(str(elem)[26:])}\"\n"
-                json += "\t" * tabs + "},\n"
+                json += "\t" * tabs + f"{{ \"{self.json_encode(elem.name)}\": [\n"
+                json += "\t" * (tabs + 1) + f"{{ \"Name\": \"{self.json_encode(elem.name)}\" }},\n"
+                json += "\t" * (tabs + 1) + f"{{ \"args\": {self.json_encode(str(len(elem.args)))} }},\n"
+                json += "\t" * (tabs + 1) + f"{{ \"use\": \"{self.json_encode(str(elem)[26:])}\" }}\n"
+                json += "\t" * tabs + "]},\n"
         elif isinstance(elem, BaseException):
             # display the error location and method
             if not self._skip_err:
-                json += "\t" * tabs + "\"Error\": {\n"
+                json += "\t" * tabs + "{ \"Error\": [\n"
                 try:
-                    json += "\t" * (tabs + 1) + f"\"on\": \"{self.json_encode(str(elem.args[2][1]))}\",\n"
-                    json += "\t" * (tabs + 1) + f"\"message\": \"{self.json_encode(str(elem.args[2][2]))}\"\n"
+                    json += "\t" * (tabs + 1) + f"{{ \"on\": \"{self.json_encode(str(elem.args[2][1]))}\" }},\n"
+                    json += "\t" * (tabs + 1) + f"{{ \"message\": \"{self.json_encode(str(elem.args[2][2]))}\" }}\n"
                 except TypeError:
-                    json += "\t" * (tabs + 1) + f"\"message\": \"{self.json_encode(str(elem.args[2]))}\"\n"
+                    json += "\t" * (tabs + 1) + f"{{ \"message\": \"{self.json_encode(str(elem.args[2]))}\" }}\n"
                 except IndexError:
-                    json += "\t" * (tabs + 1) + f"\"message\": \"{self.json_encode(str(elem))}\"\n"
-                json += "\t" * tabs + "},\n"
+                    json += "\t" * (tabs + 1) + f"{{ \"message\": \"{self.json_encode(str(elem))}\" }}\n"
+                json += "\t" * tabs + "]},\n"
         else:
             # display the variable and value
             name = self.json_encode(kwargs.get('name', 'Unknown'))
@@ -343,5 +334,5 @@ class JSONExport(ExportStr):
             elif not isinstance(elem, (int, float, complex)):
                 elem = f"\"{self.json_encode(str(elem))}\""
 
-            json += "\t" * tabs + f"\"{name}\": {elem},\n"
+            json += "\t" * tabs + f"{{ \"{name}\": {elem} }},\n"
         return json

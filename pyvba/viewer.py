@@ -187,7 +187,11 @@ class CollectionViewer(Viewer):
         super().__init__(obj, name, parent)
 
         self._count = len(self._com)
-        self._items = [Viewer.gettype(i, name, self) for i in self._com if i is not super()._com]
+        self._items = [
+            Viewer.gettype(i, name, self)
+            for i in self._com
+            if i is not super()._com
+        ]
 
     def __str__(self):
         return super().__str__().replace('Viewer', 'CollectionViewer')

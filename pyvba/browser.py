@@ -5,7 +5,7 @@ from collections import OrderedDict
 skip = ['Application', 'Parent']
 
 # store a dictionary of the discovered items
-found = OrderedDict()
+visited = OrderedDict()
 
 
 class Browser(Viewer):
@@ -42,8 +42,8 @@ class Browser(Viewer):
     @staticmethod
     def clr_found():
         """Clears the stored dictionary of items browsed."""
-        global found
-        found = OrderedDict()
+        global visited
+        visited = OrderedDict()
 
     @staticmethod
     def skip(*item: str):
@@ -76,7 +76,7 @@ class Browser(Viewer):
 
     def _generate(self):
         """Iterates through all objects when called upon."""
-        global skip, found
+        global skip, visited
 
         # iterate through items
         for name in self._objects + [i.name for i in self._methods]:
@@ -96,16 +96,16 @@ class Browser(Viewer):
                 self._errors[name] = e.args
                 continue
 
-        # add items to the 'found' dictionary
+        # add items to the visited dictionary
         for name, value in self._all.items():
             if isinstance(value, Viewer):
-                if value.type not in found:
-                    found[value.type] = []
+                if value.type not in visited:
+                    visited[value.type] = []
 
-                if value not in found[value.type]:
-                    found[value.type].append(value)
+                if value not in visited[value.type]:
+                    visited[value.type].append(value)
                 else:
-                    self._all[name] = found[value.type].index(value)
+                    self._all[name] = visited[value.type].index(value)
 
     def search(self, name: str, exact: bool = False):
         """Return a dictionary in format {path: item} matching the name.
