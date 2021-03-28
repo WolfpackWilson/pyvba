@@ -105,7 +105,17 @@ class Browser(Viewer):
                 if value not in visited[value.type]:
                     visited[value.type].append(value)
                 else:
-                    self._all[name] = visited[value.type].index(value)
+                    self._all[name] = visited[value.type][visited[value.type].index(value)]
+
+    def browse_all(self):
+        """Populate the browser and all descendents of the browser."""
+        if self._all == {}:
+            self._generate()
+
+        # populate child browsers if not already visited
+        for name, value in self._all.items():
+            if type(value) is Browser and value not in visited[value.type]:
+                name.browse_all()
 
     def search(self, name: str, exact: bool = False):
         """Return a dictionary in format {path: item} matching the name.
@@ -139,6 +149,10 @@ class Browser(Viewer):
         `goto('Bodies/Item/1/HybridShapes/GetItem')` yields the 'GetItem' function.
 
         """
+        ...
+
+    def view_vba(self) -> str:
+        """Returns a string that replicates the VBA tree."""
         ...
 
     def regen(self):
