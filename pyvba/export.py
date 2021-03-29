@@ -210,7 +210,7 @@ class XMLExport(ExportStr):
         tag = XMLExport.Tag(self._browser.name, count=len(visited2))
         xml = self._xml_head + tag.open_tag + "\n"
 
-        # iterate through dictionary items
+        # iterate through dictionary
         for var, value in visited2.items():
             tag1 = XMLExport.Tag(var, count=len(value))
             xml += "\t" + tag1.open_tag + "\n"
@@ -360,7 +360,7 @@ class JSONExport(ExportStr):
     def _check(self):
         """Check if the JSON string needs to be generated."""
         if self._data is None:
-            self._data = self._generate_vba(self._browser)
+            self._data = self._generate_vba(self._browser) if self._vba_form else self._generate_dict()
             self._data = re.sub(r',(?!\s*?[{\[\"\'\w])', '', self._data)
 
     def _generate_vba(self, elem, tabs: int = 0, **kwargs) -> str:
@@ -380,7 +380,15 @@ class JSONExport(ExportStr):
         """
 
         json = ''
+        stack = kwargs.get('stack', [])
+
         if isinstance(elem, Browser):
+            # check if in stack already
+            if elem in stack:
+                return "\t" * tabs + f"{{ \"{self.json_encode(elem.name)}\": \"BrowserObject: See ancestors\" }},\n"
+            else:
+                stack.append(elem)
+
             # display the browser and its children
             json += "\t" * tabs + f"{{ \"{self.json_encode(elem.name)}\": [\n"
 
@@ -388,21 +396,21 @@ class JSONExport(ExportStr):
                 if type(value) is list and len(value) > 0:
                     json += "\t" * (tabs + 1) + "{ \"Item\": [\n"
                     for i in value:
-                        json += self._generate_vba(i, tabs + 2)
+                        json += self._generate_vba(i, tabs + 2, stack=stack)
                     json += "\t" * (tabs + 1) + "]},\n"
                 else:
-                    json += self._generate_vba(value, tabs + 1, name=item)
+                    json += self._generate_vba(value, tabs + 1, name=item, stack=stack)
 
             json += "\t" * tabs + "]},\n"
         elif isinstance(elem, FunctionViewer):
             if not self._skip_func:
                 # display the function and its properties
                 json += "\t" * tabs + f"{{ \"{self.json_encode(elem.name)}\": [\n"
-                json += "\t" * (tabs + 1) + f"{{ \"Name\": \"{self.json_encode(elem.name)}\" }},\n"
+                json += "\t" * (tabs + 1) + f"{{ \"name\": \"{self.json_encode(elem.name)}\" }},\n"
                 json += "\t" * (tabs + 1) + f"{{ \"args\": {self.json_encode(str(len(elem.args)))} }},\n"
                 json += "\t" * (tabs + 1) + f"{{ \"use\": \"{self.json_encode(str(elem)[26:])}\" }}\n"
                 json += "\t" * tabs + "]},\n"
-        elif isinstance(elem, BaseException):
+        elif isinstance(elem, com_error):
             # display the error location and method
             if not self._skip_err:
                 json += "\t" * tabs + "{ \"Error\": [\n"
@@ -425,3 +433,77 @@ class JSONExport(ExportStr):
 
             json += "\t" * tabs + f"{{ \"{name}\": {elem} }},\n"
         return json
+
+    def _generate_dict(self) -> str:
+        # collect visited data and obtain a copy
+        """Begin generating the XML string based on the visited dictionary."""
+        # populate browser and copy visited
+        self._browser.browse_all()
+        visited2 = copy.copy(visited)
+        json = f'{{ "{self._browser.name}": [\n'
+
+        # iterate through dictionary items
+        for var, value in visited2.items():
+            json += f'\t{{ "{var}": [\n'
+
+            # iterate through each list
+            for item in value:
+                json += f'\t\t{{ "{item.name}": [\n'
+
+                # iterate through each browser in the list
+                for var2, value2 in item.all.items():
+                    # check for a collection object
+                    if isinstance(value2, list):
+                        json += f'\t\t\t{{ "{var2}": [\n'
+
+                        # iterate through the browser's collection
+                        for item2 in value2:
+                            output = item2.name if isinstance(item2, Browser) else item2
+                            json += f'\t\t\t\t{{ "{output}": "BrowserObject" }},\n'
+
+                        json += '\t\t\t]},\n'
+                    else:
+                        if isinstance(value2, Browser):
+                            json += f'\t\t\t{{ \"{value2.name}\": \"BrowserObject\" }},\n'
+
+                        elif isinstance(value2, com_error):
+                            if self._skip_err:
+                                continue
+
+                            json += "\t\t\t{ \"Error\": [\n"
+                            try:
+                                json += f"\t\t\t\t{{ \"on\": \"{self.json_encode(str(value2.args[2][1]))}\" }},\n"
+                                json += f"\t\t\t\t{{ \"message\": \"{self.json_encode(str(value2.args[2][2]))}\" }}\n"
+                            except TypeError:
+                                json += f"\t\t\t\t{{ \"message\": \"{self.json_encode(str(value2.args[2]))}\" }}\n"
+                            except IndexError:
+                                json += f"\t\t\t\t{{ \"message\": \"{self.json_encode(str(value2))}\" }}\n"
+                            json += "\t\t\t]},\n"
+
+                        elif isinstance(value2, FunctionViewer):
+                            if self._skip_func:
+                                continue
+                            # display the function and its properties
+                            json += f"\t\t\t{{ \"{self.json_encode(value2.name)}\": [\n"
+                            json += f"\t\t\t\t{{ \"name\": \"{self.json_encode(value2.name)}\" }},\n"
+                            json += f"\t\t\t\t{{ \"args\": {self.json_encode(str(len(value2.args)))} }},\n"
+                            json += f"\t\t\t\t{{ \"use\": \"{self.json_encode(str(value2)[26:])}\" }}\n"
+                            json += "\t\t\t]},\n"
+
+                        else:
+                            # display the variable and value
+                            name = self.json_encode(var2)
+                            elem = value2
+
+                            if isinstance(value2, bool):
+                                elem = str(value2).lower()
+                            elif not isinstance(value2, (int, float, complex)):
+                                elem = f"\"{self.json_encode(str(value2))}\""
+
+                            json += f"\t\t\t{{ \"{name}\": {elem} }},\n"
+
+                json += '\t\t]},\n'
+
+            json += '\t]},\n'
+
+        return json + ']}\n'
