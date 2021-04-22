@@ -435,8 +435,8 @@ class JSONExport(ExportStr):
         return json
 
     def _generate_dict(self) -> str:
-        # collect visited data and obtain a copy
-        """Begin generating the XML string based on the visited dictionary."""
+        """Begin generating the JSON string based on the visited dictionary."""
+
         # populate browser and copy visited
         self._browser.browse_all()
         visited2 = copy.copy(visited)
@@ -464,7 +464,7 @@ class JSONExport(ExportStr):
                         json += '\t\t\t]},\n'
                     else:
                         if isinstance(value2, Browser):
-                            json += f'\t\t\t{{ \"{value2.name}\": \"BrowserObject\" }},\n'
+                            json += f'\t\t\t{{ "{value2.name}": "BrowserObject" }},\n'
 
                         elif isinstance(value2, com_error):
                             if self._skip_err:

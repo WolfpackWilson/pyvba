@@ -104,8 +104,6 @@ class Browser(Viewer):
 
                 if value not in visited[value.type]:
                     visited[value.type].append(value)
-                else:
-                    self._all[name] = visited[value.type][visited[value.type].index(value)]
 
     def browse_all(self):
         """Populate the browser and all descendents of the browser."""
@@ -114,46 +112,8 @@ class Browser(Viewer):
 
         # populate child browsers if not already visited
         for name, value in self._all.items():
-            if type(value) is Browser and value not in visited[value.type]:
+            if isinstance(value, Browser) and value not in visited[value.type]:
                 name.browse_all()
-
-    def search(self, name: str, exact: bool = False):
-        """Return a dictionary in format {path: item} matching the name.
-
-        Search for all instances of a method or object containing a name.
-
-        Parameters
-        ----------
-        exact: bool
-            A flag that searches for exact matches.
-        name: str
-            The name of the attribute to search for.
-
-        Returns
-        -------
-        dict
-            The results of the search in format {path: item}.
-        """
-        ...
-
-    def goto(self, path: str):
-        """Retrieve an object at a given location.
-
-        Parameters
-        ----------
-        path: str
-            The location of the item delimited by '/'.
-
-        Examples
-        --------
-        `goto('Bodies/Item/1/HybridShapes/GetItem')` yields the 'GetItem' function.
-
-        """
-        ...
-
-    def view_vba(self) -> str:
-        """Returns a string that replicates the VBA tree."""
-        ...
 
     def regen(self):
         """Regenerate the `all` property."""
@@ -162,13 +122,23 @@ class Browser(Viewer):
 
 
 class CollectionBrowser(Browser, CollectionViewer):
-    def __init__(self, obj: CollectionViewer):
+    def __init__(self, obj):
         super().__init__(obj.com, obj.name, obj.parent)
-        self._items = [self.from_viewer(i) for i in self._items]
+        self._items = [self.from_viewer(item) for item in self._items]
 
     def __str__(self):
         return "<class 'CollectionBrowser'>: " + self._name
 
     def _generate(self):
+        global visited
         super()._generate()
         self._all['Item'] = self._items
+
+        # add items to the visited dictionary
+        for value in self._all['Item']:
+            if isinstance(value, Viewer):
+                if value.type not in visited:
+                    visited[value.type] = []
+
+                if value not in visited[value.type]:
+                    visited[value.type].append(value)

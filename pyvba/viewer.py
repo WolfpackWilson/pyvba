@@ -41,9 +41,6 @@ class Viewer:
 
         self._errors = {}
 
-    def __eq__(self, other):
-        return other.type == self._type and other.name == self._name
-
     def __getattr__(self, item):
         return self.getattr(item)
 
@@ -190,7 +187,6 @@ class CollectionViewer(Viewer):
         self._items = [
             Viewer.gettype(i, name, self)
             for i in self._com
-            if i is not super()._com
         ]
 
     def __str__(self):
