@@ -1,10 +1,17 @@
+import os
+import re
+import shutil
+import sys
 from inspect import getfullargspec
 
 from win32com.client.gencache import EnsureDispatch
 
+# define regular expressions
+class_re = re.compile(r"(?<=\.)[^.]+?(?='>)")
+
 
 class Viewer:
-    def __init__(self, app, **kwargs):
+    def __init__(self, app, name: str = None, parent: object = None):
         """Create a viewer from an application string or win32com object.
 
         The Viewer object used to observe and explore COM objects from external
@@ -13,50 +20,84 @@ class Viewer:
         Parameters
         ----------
         app
-            The application string (e.g. "Excel.Application") or win32com object.
+            The application string (e.g. "Excel.Application"), Viewer, or win32com object.
+        name: str
+            The name of the object. It will generate automatically unless string is given.
+        parent: object
+            The parent object, if applicable.
         """
 
-        self._com = EnsureDispatch(app)
-        self._name = kwargs.get('name', repr(app)[1:-1])
-        self._parent = kwargs.get('parent', None)
-        self._kwargs = kwargs
+        self._com = self.ensure_dispatch(app) if not isinstance(app, Viewer) else app
+        self._name = name if name else self._com.Name
+        self._type = class_re.findall(str(self._com.__class__))[0]
+        self._parent = parent
+
         self._objects = [key for key in getattr(self._com, '_prop_map_get_').keys()]
         self._methods = [
-            i for i in dir(self._com)
-            if '_' not in i and i not in ['CLSID', 'coclass_clsid']
+            FunctionViewer(getattr(self._com, i), i)
+            for i in dir(self._com)
+            if '_' not in i and i not in ['CLSID', 'Item']
         ]
+
         self._errors = {}
 
     def __getattr__(self, item):
-        """Return a variable, FunctionViewer, or Browser object."""
-        try:
-            obj = getattr(self._com, item)
-        except KeyboardInterrupt:
-            raise
-        except BaseException as e:
-            self._errors[item] = e.args
-            return e
-
-        if '<bound method' in repr(obj):
-            if "Item" in item:
-                try:
-                    count = getattr(self._com, 'Count')
-                    return IterableFunctionViewer(obj, item, count)
-                except AttributeError:
-                    return FunctionViewer(obj, item)
-            else:
-                return FunctionViewer(obj, item)
-        elif 'win32com' in repr(obj) or 'COMObject' in repr(obj):
-            return Viewer(obj, parent=self._com, name=item)
-        else:
-            return obj
-
-    def __iter__(self):
-        """Return iteration of the combined names of the objects and methods."""
-        return (str(obj) for obj in self._objects + self._methods)
+        return self.getattr(item)
 
     def __str__(self):
         return "<class 'Viewer'>: " + self._name
+
+    @staticmethod
+    def ensure_dispatch(com):
+        """Ensures the COM object is generated and retrieved.
+
+        Sometimes the cache needs to be cleared. In this case, an attribute error is thrown and caught.
+        """
+        try:
+            app = EnsureDispatch(com)
+        except (AttributeError, TypeError):
+            # Remove cache and try again.
+            module_list = [m.__name__ for m in sys.modules.values()]
+            for module in module_list:
+                if re.match(r'win32com\.gen_py\..+', module):
+                    del sys.modules[module]
+            shutil.rmtree(os.path.join(os.environ.get('LOCALAPPDATA'), 'Temp', 'gen_py'))
+            app = EnsureDispatch(com)
+        return app
+
+    @staticmethod
+    def gettype(obj, item: str = None, parent: object = None):
+        """Return the appropriate variable or Viewer instance."""
+        if '<bound method' in repr(obj):
+            return FunctionViewer(obj, item)
+        elif 'win32com' in repr(obj) or 'COMObject' in repr(obj):
+            try:
+                _ = len(obj)
+                return CollectionViewer(obj, item, parent)
+            except (TypeError, AttributeError):
+                return Viewer(obj, item, parent)
+        return obj
+
+    def getattr(self, item):
+        """Return a variable, FunctionViewer, or Viewer object."""
+        try:
+            obj = getattr(self._com, item)
+        except (AttributeError, KeyboardInterrupt):
+            raise
+        except BaseException as e:
+            self._errors[item] = e
+            return e
+
+        return self.gettype(obj, item)
+
+    def cf(self, other) -> bool:
+        """Comparison alternative to __eq__.
+
+        The comparison avoids checking any Viewer instances and compares the values of the standard objects within.
+        """
+        if type(self) != type(other):
+            return False
+        return self._type == other.type and self._name == other.name and self._objects == other.objects
 
     @property
     def com(self):
@@ -64,9 +105,14 @@ class Viewer:
         return self._com
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return the name of the COM object."""
         return self._name
+
+    @property
+    def type(self) -> str:
+        """Return the type of the object within the COM object."""
+        return self._type
 
     @property
     def parent(self):
@@ -84,36 +130,17 @@ class Viewer:
         return self._methods
 
     @property
-    def variables(self) -> dict:
-        """Return a dictionary in format {name: value}."""
-        variables = {}
-
-        for key in self._objects:
-            if not isinstance(self.view(key), (Viewer, BaseException)):
-                variables[key] = self.getattr(key)
-        return variables
-
-    @property
-    def errors(self):
+    def errors(self) -> dict:
         """Return a dictionary in format {obj: Error}."""
         return self._errors
 
-    def getattr(self, item):
-        """Alternative to `Viewer.Attribute`. Return a variable, object, or method."""
-        return self.view(item)
-
-    def func(self, name, *args):
-        """Alternative to `Viewer.Attribute(*args)`. Runs a function based on arguments given and returns
-        the result."""
-        return getattr(self, name)(*args)
-
     def view(self, attr):
         """Alternative to `Viewer.Attribute`. Return a variable, FunctionViewer, or Browser object."""
-        return getattr(self, attr)
+        return self.getattr(attr)
 
 
 class FunctionViewer:
-    def __init__(self, func, name: str = None, **kwargs):
+    def __init__(self, func, name: str):
         """Create a viewer from a stored function.
 
         A viewer object used to observe and run functions extracted from the Viewer.
@@ -122,8 +149,6 @@ class FunctionViewer:
         ----------
         func
             A bound method.
-        name : str, optional
-            The name of the bound method.
         """
 
         self._func = func
@@ -133,21 +158,15 @@ class FunctionViewer:
 
     def __call__(self, *args, **kwargs):
         """Calls the function and returns the function output."""
-        return self._func(*args, **kwargs)
+        return Viewer.gettype(self._func(*args, **kwargs))
 
     def __str__(self):
         """Return a string of the class and how to use the function."""
-        name = "func_name" if self._name is None else self._name
         args = ""
 
         for arg in self._args[1:]:
             args += arg + ', '
-        return f"<class 'FunctionViewer'>: {name}({args[:-2]})"
-
-    @property
-    def func(self):
-        """Return the function instance."""
-        return self._func
+        return f"<class 'FunctionViewer'>: {self._name}({args[:-2]})"
 
     @property
     def name(self) -> str:
@@ -169,44 +188,35 @@ class FunctionViewer:
         return self(*args, **kwargs)
 
 
-class IterableFunctionViewer(FunctionViewer):
-    def __init__(self, func, name, count, **kwargs):
-        """Create a viewer from a stored iterable function.
+class CollectionViewer(Viewer):
+    def __init__(self, obj, name: str = None, parent: object = None):
+        super().__init__(obj, name, parent)
 
-        Parameters
-        ----------
-        func
-            A bound method.
-        name : str, optional
-            The name of the bound method.
-        count : int
-            The number of items held.
-        """
-        super().__init__(func, name, **kwargs)
-        self._count = count
+        self._count = len(self._com)
         self._items = [
-            Viewer(func(i), name=str(i), **kwargs)
-            for i in range(1, count + 1)
+            Viewer.gettype(i, name, self)
+            for i in self._com
         ]
 
     def __str__(self):
-        """Return a string of the class and how to use the function."""
-        return super().__str__().replace("FunctionViewer", "IterableFunctionViewer")
+        return super().__str__().replace('Viewer', 'CollectionViewer')
 
-    def __iter__(self):
-        """Iterate through each item in the iterable function."""
-        return (item for item in self._items)
+    def __len__(self):
+        return self._count
+
+    def __getitem__(self, item):
+        return self._items[item]
 
     @property
     def count(self) -> int:
-        """Return the count of the iterable function."""
+        """Return the number of items in the collection."""
         return self._count
 
     @property
     def items(self) -> list:
-        """Return the items of the iterable function."""
+        """Return the items in the collection."""
         return self._items
 
-    def item(self, i: int):
-        """Return a specific item of the iterable function."""
-        return self._items[i]
+    def item(self, index):
+        """Return one of the items."""
+        return self[index]

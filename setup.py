@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pyvba",
-    version="0.5.1",
+    version="0.6.0",
     author="Jack Wilson",
     description="Data mine and write scrips for VBA applications on Windows.",
     long_description=long_description,
