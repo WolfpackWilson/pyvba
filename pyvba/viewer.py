@@ -90,18 +90,27 @@ class Viewer:
 
         return self.gettype(obj, item)
 
+    def cf(self, other) -> bool:
+        """Comparison alternative to __eq__.
+
+        The comparison avoids checking any Viewer instances and compares the values of the standard objects within.
+        """
+        if type(self) != type(other):
+            return False
+        return self._type == other.type and self._name == other.name and self._objects == other.objects
+
     @property
     def com(self):
         """Return the COM object."""
         return self._com
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return the name of the COM object."""
         return self._name
 
     @property
-    def type(self):
+    def type(self) -> str:
         """Return the type of the object within the COM object."""
         return self._type
 
@@ -121,7 +130,7 @@ class Viewer:
         return self._methods
 
     @property
-    def errors(self):
+    def errors(self) -> dict:
         """Return a dictionary in format {obj: Error}."""
         return self._errors
 

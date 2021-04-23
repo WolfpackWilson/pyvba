@@ -150,7 +150,7 @@ class XMLExport(ExportStr):
             tag = XMLExport.Tag(elem.name)
 
             # check if in stack already
-            if elem in stack:
+            if any(map(lambda obj: elem.cf(obj), stack)):
                 return tag.enclose('BrowserObject: See ancestors', tabs)
             else:
                 stack.append(elem)
@@ -384,7 +384,7 @@ class JSONExport(ExportStr):
 
         if isinstance(elem, Browser):
             # check if in stack already
-            if elem in stack:
+            if any(map(lambda obj: elem.cf(obj), stack)):
                 return "\t" * tabs + f"{{ \"{self.json_encode(elem.name)}\": \"BrowserObject: See ancestors\" }},\n"
             else:
                 stack.append(elem)

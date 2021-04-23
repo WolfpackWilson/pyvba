@@ -102,7 +102,7 @@ class Browser(Viewer):
                 if value.type not in visited:
                     visited[value.type] = []
 
-                if value not in visited[value.type]:
+                if not any(map(lambda item: value.cf(item), visited[value.type])):
                     visited[value.type].append(value)
 
     def browse_all(self):
@@ -112,8 +112,19 @@ class Browser(Viewer):
 
         # populate child browsers if not already visited
         for name, value in self._all.items():
-            if isinstance(value, Browser) and value not in visited[value.type]:
+            if isinstance(value, Browser) and not any(map(lambda item: value.cf(item), visited[value.type])):
                 name.browse_all()
+
+    def cf(self, other) -> bool:
+        """Comparison alternative to __eq__.
+
+        The comparison avoids checking any Viewer instances and compares the values of the standard objects within.
+        """
+        return super().cf(other) and all([
+            a == b
+            for a, b in zip(self._all.values(), other.all.values())
+            if not isinstance(a, (Viewer, FunctionViewer, list)) and not isinstance(b, (Viewer, FunctionViewer, list))
+        ])
 
     def regen(self):
         """Regenerate the `all` property."""
@@ -134,6 +145,10 @@ class CollectionBrowser(Browser, CollectionViewer):
         super()._generate()
         self._all['Item'] = self._items
 
+        # generate the Item list
+        if len(self._items) > 0 and isinstance(self._items[0], Browser):
+            _ = [item.all for item in self._items]
+
         # add items to the visited dictionary
         for value in self._all['Item']:
             if isinstance(value, Viewer):
@@ -142,3 +157,4 @@ class CollectionBrowser(Browser, CollectionViewer):
 
                 if value not in visited[value.type]:
                     visited[value.type].append(value)
+
