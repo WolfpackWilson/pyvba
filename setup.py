@@ -10,7 +10,7 @@ setuptools.setup(
     description="Data mine and write scrips for VBA applications on Windows.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/TheEric960/pyvba",
+    url="https://github.com/WolfpackWilson/pyvba",
     packages=setuptools.find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
