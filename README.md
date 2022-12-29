@@ -1,7 +1,7 @@
 # pyvba
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pyvba)
 [![PyPI](https://img.shields.io/pypi/v/pyvba)](https://pypi.org/project/pyvba/)
-[![GitHub](https://img.shields.io/github/license/TheEric960/pyvba)](https://github.com/TheEric960/pyvba)
+[![GitHub](https://img.shields.io/github/license/WolfpackWilson/pyvba)](https://github.com/WolfpackWilson/pyvba)
 
 The pyvba package was designed to gather data from VBA-based applications (e.g. Microsoft Excel, CATIA, etc.). It may also be used to assist programming VBA macro scripts using the Python language. 
 
@@ -71,4 +71,4 @@ Example Output:
 
 
 ## Developer Notes
-This package is in beta. Therefore, there are still some problematic bugs and issues that cause errors in certain applications. Contributors are welcome! The project is [hosted on GitHub](https://github.com/TheEric960/pyvba). Report any issues at [the issue tracker](https://github.com/TheEric960/pyvba/issues), but please check to see if the issue already exists!
+This package is in beta. Therefore, there are still some problematic bugs and issues that cause errors in certain applications. Contributors are welcome! The project is [hosted on GitHub](https://github.com/WolfpackWilson/pyvba). Report any issues at [the issue tracker](https://github.com/WolfpackWilson/pyvba/issues), but please check to see if the issue already exists!
